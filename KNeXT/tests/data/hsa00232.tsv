@@ -1,0 +1,22 @@
+entry1	entry2	type	value	name
+hsa:10-55	hsa:1544-63	ECrel	30	compound
+hsa:10-55	hsa:7498-65	ECrel	30	compound
+hsa:1544-38	hsa:10-55	ECrel	30	compound
+hsa:1544-38	hsa:7498-40	ECrel	70	compound
+hsa:1544-38	hsa:7498-65	ECrel	30	compound
+hsa:1544-38	hsa:9-55	ECrel	30	compound
+hsa:1544-54	hsa:10-55	ECrel	30	compound
+hsa:1544-54	hsa:9-55	ECrel	30	compound
+hsa:1544-63	hsa:7498-65	ECrel	30	compound
+hsa:1548-85	hsa:10-55	ECrel	30	compound
+hsa:1548-85	hsa:1544-38	ECrel	30	compound
+hsa:1548-85	hsa:1544-63	ECrel	30	compound
+hsa:1548-85	hsa:9-55	ECrel	30	compound
+hsa:1549-85	hsa:10-55	ECrel	30	compound
+hsa:1549-85	hsa:1544-38	ECrel	30	compound
+hsa:1549-85	hsa:1544-63	ECrel	30	compound
+hsa:1549-85	hsa:9-55	ECrel	30	compound
+hsa:9-55	hsa:1544-63	ECrel	30	compound
+hsa:9-55	hsa:7498-65	ECrel	30	compound
+hsa:10-55	hsa:9-55	type 2	undirectional	clique
+hsa:1548-85	hsa:1549-85	type 2	undirectional	clique

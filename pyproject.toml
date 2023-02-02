@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "KNeXT"
+version = "0.1.0"
+description = "Kyoto Encylopedia of Genes and Genomes Markup Language File parser and converter"
+authors = ["Everest Uriel Castaneda <everest_castaneda1@baylor.edu>"]
+readme = "README.rst"
+license = "LICENSE"
+
+[tool.poetry.scripts]
+get-kgml = "KNeXT.get_kgml:app"
+parse-genes = "KNeXT.KNeXT:app"
+parse-mixed = "KNeXT.KNeXTm:app"
+convert = "KNeXT.converter:app"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+typer = {extras = ["all"], version = "^0.7.0"}
+requests = "^2.28.1"
+pandas = "^1.5.2"
+networkx = "^2.8.8"
+pytest = "^7.2.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -4,7 +4,8 @@ KEGG NetworkX Topological (KNeXT) parser
 
 KNeXT downloads and parses Kyoto Encylopedia of Genes and Genomes 
 (KEGG) markup language files (KGML). The tool employs NetworkX's framework
-to not only create gene-only networks, but mixed: gene, compound, pathway networks. 
+to not only create gene-only networks but mixed networks which contain the following: 
+genes, compounds, and pathways. 
 KNeXT is designed to ingest KGML files through built-in APIs and dynamically 
 create high-fidelity topological representations.
 All output files are in TSV format. KNeXT also

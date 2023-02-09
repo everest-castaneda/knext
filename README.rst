@@ -4,11 +4,8 @@ KEGG NetworkX Topological (KNeXT) parser
 
 KNeXT downloads and parses Kyoto Encylopedia of Genes and Genomes 
 (KEGG) markup language files (KGML). The tool employs NetworkX's framework
-to not only create gene-only networks but mixed networks which contain the following: 
-genes, compounds, and pathways. 
-KNeXT is designed to ingest KGML files through built-in APIs and dynamically 
-create high-fidelity topological representations.
-All output files are in TSV format. KNeXT also
+to create gene-only networks, but mixed (gene, compound, pathway) networks
+can also be generated. All output files are in TSV format. KNeXT also
 retrieves a TXT file of node x-y axis coordinates for use in NetworkX's
 graph visualization library, and it is able to convert KEGG IDs 
 into Uniprot and NCBI IDs. 
@@ -59,7 +56,7 @@ Usage
       --graphics	outputs x-y axis coordinates
       --help	shows options and file types
 
-    Primary line: convert [OPTIONS]
+    Primary line: convert-network [OPTIONS]
       
       KNeXT parser converts KEGG entry IDs in TSV output files into
       UniProt or NCBI IDs.
@@ -96,7 +93,7 @@ The resulting output folder can be used to convert the TSV files and graphics fi
 
 .. code:: text
       
-    $ convert folder kegg_gene_network_hsa hsa --graphics kegg_gene_network_hsa
+    $ convert-network folder kegg_gene_network_hsa hsa --graphics kegg_gene_network_hsa
 
 Inputs
 ------
@@ -143,6 +140,7 @@ Repo can be downloaded and installed through poetry__:
     $ cd knext
     $ poetry shell
     $ poetry install
+    $ poetry run [get-kgml, parse-genes, parse-mixed, or convert-network]
 
 .. __: https://python-poetry.org/
 
@@ -151,7 +149,7 @@ Requirements
 
 Requirements are (also see ``pyproject.toml``):
 
-- Python >= 3.10
+- Python >= 3.9
 - typer__
 - requests__
 - pandas__

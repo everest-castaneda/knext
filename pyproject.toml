@@ -1,25 +1,45 @@
 [tool.poetry]
 name = "KNeXT"
-version = "0.1.0"
+version = "1.0.0"
 description = "Kyoto Encylopedia of Genes and Genomes Markup Language File parser and converter"
 authors = ["Everest Uriel Castaneda <everest_castaneda1@baylor.edu>"]
 readme = "README.rst"
 license = "LICENSE"
 
 [tool.poetry.scripts]
-get-kgml = "KNeXT.get_kgml:app"
-parse-genes = "KNeXT.KNeXT:app"
-parse-mixed = "KNeXT.KNeXTm:app"
-convert = "KNeXT.converter:app"
+get-kgml = "knext.get_kgml:app"
+parse-genes = "knext.KNeXT:app"
+parse-mixed = "knext.KNeXTm:app"
+convert-network = "knext.converter:app"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.9"
 typer = {extras = ["all"], version = "^0.7.0"}
 requests = "^2.28.1"
-pandas = "^1.5.2"
-networkx = "^2.8.8"
+pandas = "^1.5.3"
+networkx = "^2.6.3"
 pytest = "^7.2.1"
+numpy = "^1.21.6"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "KNeXT"
+version = "1.0.0"
+authors = [
+  { name="Everest Uriel Castaneda", email="everest_castaneda1@baylor.edu" },
+]
+description = "KEGG NetworkX Topological Parser"
+readme = "README.rst"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/everest-castaneda/knext"
+"Bug Tracker" = "https://github.com/everest-castaneda/knext/issues"

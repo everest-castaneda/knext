@@ -130,7 +130,7 @@ Installation is via pip:
 
 .. code:: bash
 
-    $ pip install https://github.com/everest/knext/knext-1.0.0.tar.gz
+    $ pip install knext
 
 Repo can be downloaded and installed through poetry__:
 

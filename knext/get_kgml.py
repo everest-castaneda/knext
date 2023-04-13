@@ -29,8 +29,8 @@ def kgml(species_name: str = typer.Argument(None, file_okay = False, dir_okay = 
         wd = Path.cwd()
         output_path = wd / 'kgml_{}'.format(species_name)
         output_path.mkdir(exist_ok = True)
-        response = requests.get(KEGGlist % species_name).text
-        pathways = [r.replace('path:', '') for r in response.split() if r.startswith('path:')]
+        response = requests.get(KEGGlist % species_name).text.split('\n')
+        pathways = [r.split('\t')[0] for r in response]
         for path in pathways:
             typer.echo(f'Now acquiring pathway {path}...')
             config = Path(output_path / '{}.xml'.format(path))

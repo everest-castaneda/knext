@@ -835,7 +835,7 @@ def folder(fp: Path, unique: bool = False, graphics: bool = False):
                                                             # creates edge [mmu:x, mmu:y]
                                                             new_edges.append([rpath[max(rindex)], lpath[min(lindex)], 'CPp', 'Custom', 'compound propagation'])
                     # Creates a dataframe of the new edges that are a result of compound propagation
-                    new_edges_df = pd.DataFrame(new_edges, columns = df_out.drop(['pos1', 'pos2'], axis = 1).columns)
+                    new_edges_df = pd.DataFrame(new_edges, columns = df_out.columns)
                     # Concatenates the new edges with the edges from the above (cliques and original parsed edges)
                     df0 = pd.concat([xdf, new_edges_df])
                     # Drop any duplicated edges

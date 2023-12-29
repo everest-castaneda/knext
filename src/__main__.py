@@ -54,7 +54,8 @@ def get_kgml(species, results):
 @click.option('-r', '--results', required = False)
 @click.option('-u', '--unique', default = False, is_flag = True)
 @click.option('-g', '--graphics', default = False, is_flag = True)
-def genes(input_data: str, results: str, unique: bool, graphics: bool):
+@click.option('-n', '--names', default = False, is_flag = True)
+def genes(input_data: str, results: str, unique: bool, graphics: bool, names: bool):
     """
     Converts a folder of KGML files or a single KGML file into a weighted
     edgelist of genes that can be used in graph analysis. If -u/--unique flag 
@@ -72,21 +73,41 @@ def genes(input_data: str, results: str, unique: bool, graphics: bool):
                 typer.echo('Directory not found.\nPlease input a directory in which to save the results...')
             else:
                 wd = Path(results)
-                if graphics and unique:
+                if graphics and unique and names:
+                    if Path(input_data).is_file():
+                        genes_file(input_data, wd, unique = True, graphics = True, names = True)
+                    else:
+                        genes_folder(input_data, wd, unique = True, graphics = True, names = True)
+                elif graphics and unique and not names:
                     if Path(input_data).is_file():
                         genes_file(input_data, wd, unique = True, graphics = True)
                     else:
                         genes_folder(input_data, wd, unique = True, graphics = True)
-                elif not graphics and unique:
+                elif graphics and names and not unique:
                     if Path(input_data).is_file():
-                        genes_file(input_data, wd, unique = True)
+                        genes_file(input_data, wd, graphics = True, names = True)
                     else:
-                        genes_folder(input_data, wd, unique = True)
-                elif graphics and not unique:
+                        genes_folder(input_data, wd, graphics = True, names = True)
+                elif graphics and not unique and not names:
                     if Path(input_data).is_file():
                         genes_file(input_data, wd, graphics = True)
                     else:
                         genes_folder(input_data, wd, graphics = True)
+                elif unique and names and not graphics:
+                    if Path(input_data).is_file():
+                        genes_file(input_data, wd, unique = True, names = True)
+                    else:
+                        genes_folder(input_data, wd, unique = True, names = True)
+                elif unique and not names and not graphics:
+                    if Path(input_data).is_file():
+                        genes_file(input_data, wd, unique = True)
+                    else:
+                        genes_folder(input_data, wd, unique = True)
+                elif names and not unique and not graphics:
+                    if Path(input_data).is_file():
+                        genes_file(input_data, wd, names = True)
+                    else:
+                        genes_folder(input_data, wd, names = True)
                 else:
                     if Path(input_data).is_file():
                         genes_file(input_data, wd)
@@ -96,21 +117,41 @@ def genes(input_data: str, results: str, unique: bool, graphics: bool):
         else:
             wd = Path.cwd()
             typer.echo(f'\nNo output directory given. All resulting files or folders will be saved to current directory:\n{wd}\n')
-            if graphics and unique:
+            if graphics and unique and names:
                 if Path(input_data).is_file():
-                    genes_file(input_data, wd, unique = True, graphics = True)
+                    genes_file(input_data, wd, unique = True, graphics = True, names = True)
                 else:
-                    genes_folder(input_data, wd, unique = True, graphics = True)
-            elif not graphics and unique:
+                    genes_folder(input_data, wd, unique = True, graphics = True, names = True)
+            elif graphics and unique and not names:
                 if Path(input_data).is_file():
-                    genes_file(input_data, wd, unique = True)
+                    genes_file(input_data, wd, graphics = True, unique = True)
                 else:
-                    genes_folder(input_data, wd, unique = True)
-            elif graphics and not unique:
+                    genes_folder(input_data, wd, graphics = True, unique = True)
+            elif graphics and names and not unique:
+                if Path(input_data).is_file():
+                    genes_file(input_data, wd, graphics = True, names = True)
+                else:
+                    genes_folder(input_data, wd, graphics = True, names = True)
+            elif graphics and not unique and not names:
                 if Path(input_data).is_file():
                     genes_file(input_data, wd, graphics = True)
                 else:
                     genes_folder(input_data, wd, graphics = True)
+            elif unique and names and not graphics:
+                if Path(input_data).is_file():
+                    genes_file(input_data, wd, unique = True, names = True)
+                else:
+                    genes_folder(input_data, wd, unique = True, names = True)
+            elif unique and not names and not graphics:
+                if Path(input_data).is_file():
+                    genes_file(input_data, wd, unique = True)
+                else:
+                    genes_folder(input_data, wd, unique = True)
+            elif names and not unique and not graphics:
+                if Path(input_data).is_file():
+                    genes_file(input_data, wd, names = True)
+                else:
+                    genes_folder(input_data, wd, names = True)
             else:
                 if Path(input_data).is_file():
                     genes_file(input_data, wd)
@@ -122,7 +163,8 @@ def genes(input_data: str, results: str, unique: bool, graphics: bool):
 @click.option('-r', '--results', required = False)
 @click.option('-u', '--unique', default = False, is_flag = True)
 @click.option('-g', '--graphics', default = False, is_flag = True)
-def mixed(input_data: str, results: str, unique: bool = False, graphics: bool = False):
+@click.option('-n', '--names', default = False, is_flag = True)
+def mixed(input_data: str, results: str, unique: bool = False, graphics: bool = False, names: bool = False):
     """
     Converts a folder of KGML files or a single KGML file into a weighted
     edgelist of mixed genes, compounds, and pathways that can be used in graph 
@@ -140,21 +182,41 @@ def mixed(input_data: str, results: str, unique: bool = False, graphics: bool = 
                 typer.echo('Directory not found.\nPlease input a directory in which to save the results...')
             else:
                 wd = Path(results)
-                if graphics and unique:
+                if graphics and unique and names:
                     if Path(input_data).is_file():
-                        mixed_file(input_data, wd, unique = True, graphics = True)
+                        mixed_file(input_data, wd, unique = True, graphics = True, names = True)
                     else:
-                        mixed_folder(input_data, wd, unique = True, graphics = True)
-                elif not graphics and unique:
+                        mixed_folder(input_data, wd, unique = True, graphics = True, names = True)
+                elif graphics and unique and not names:
                     if Path(input_data).is_file():
-                        mixed_file(input_data, wd, unique = True)
+                        mixed_file(input_data, wd, graphics = True, unique = True)
                     else:
-                        mixed_folder(input_data, wd, unique = True)
-                elif graphics and not unique:
+                        mixed_folder(input_data, wd, graphics = True, unique = True)
+                elif graphics and names and not unique:
+                    if Path(input_data).is_file():
+                        mixed_file(input_data, wd, graphics = True, names = True)
+                    else:
+                        mixed_folder(input_data, wd, graphics = True, names = True)
+                elif graphics and not unique and not names:
                     if Path(input_data).is_file():
                         mixed_file(input_data, wd, graphics = True)
                     else:
                         mixed_folder(input_data, wd, graphics = True)
+                elif unique and names and not graphics:
+                    if Path(input_data).is_file():
+                        mixed_file(input_data, wd, unique = True, names = True)
+                    else:
+                        mixed_folder(input_data, wd, unique = True, names = True)
+                elif unique and not names and not graphics:
+                    if Path(input_data).is_file():
+                        mixed_file(input_data, wd, unique = True)
+                    else:
+                        mixed_folder(input_data, wd, unique = True)
+                elif names and not unique and not graphics:
+                    if Path(input_data).is_file():
+                        mixed_file(input_data, wd, names = True)
+                    else:
+                        mixed_folder(input_data, wd, names = True)
                 else:
                     if Path(input_data).is_file():
                         mixed_file(input_data, wd)
@@ -163,21 +225,41 @@ def mixed(input_data: str, results: str, unique: bool = False, graphics: bool = 
         else:
             wd = Path.cwd()
             typer.echo(f'No output directory given. All resulting files or folders will be saved to current directory:\n{wd}\n')
-            if graphics and unique:
+            if graphics and unique and names:
                 if Path(input_data).is_file():
-                    mixed_file(input_data, wd, unique = True, graphics = True)
+                    mixed_file(input_data, wd, unique = True, graphics = True, names = True)
                 else:
-                    mixed_folder(input_data, wd, unique = True, graphics = True)
-            elif not graphics and unique:
+                    mixed_folder(input_data, wd, unique = True, graphics = True, names = True)
+            elif graphics and unique and not names:
                 if Path(input_data).is_file():
-                    mixed_file(input_data, wd, unique = True)
+                    mixed_file(input_data, wd, graphics = True, unique = True)
                 else:
-                    mixed_folder(input_data, wd, unique = True)
-            elif graphics and not unique:
+                    mixed_folder(input_data, wd, graphics = True, unique = True)
+            elif graphics and names and not unique:
+                if Path(input_data).is_file():
+                    mixed_file(input_data, wd, graphics = True, names = True)
+                else:
+                    mixed_folder(input_data, wd, graphics = True, names = True)
+            elif graphics and not unique and not names:
                 if Path(input_data).is_file():
                     mixed_file(input_data, wd, graphics = True)
                 else:
                     mixed_folder(input_data, wd, graphics = True)
+            elif unique and names and not graphics:
+                if Path(input_data).is_file():
+                    mixed_file(input_data, wd, unique = True, names = True)
+                else:
+                    mixed_folder(input_data, wd, unique = True, names = True)
+            elif unique and not names and not graphics:
+                if Path(input_data).is_file():
+                    mixed_file(input_data, wd, unique = True)
+                else:
+                    mixed_folder(input_data, wd, unique = True)
+            elif names and not unique and not graphics:
+                if Path(input_data).is_file():
+                    mixed_file(input_data, wd, names = True)
+                else:
+                    mixed_folder(input_data, wd, names = True)
             else:
                 if Path(input_data).is_file():
                     mixed_file(input_data, wd)

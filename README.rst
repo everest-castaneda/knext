@@ -9,7 +9,8 @@ can also be generated. All output files are in TSV format. KNeXT also
 retrieves a TXT file of node x-y axis coordinates for use in NetworkX's
 graph visualization library, and it is able to convert KEGG IDs 
 into Uniprot and NCBI IDs. KNeXT also maximizes metadata information
-through preserving each edge's information.
+through preserving each edge's information and adding gene, compound, and
+pathways names.
 
 Usage
 -----
@@ -37,6 +38,8 @@ Usage
       -r/--results	file or folder where output should be stored	
       -g/--graphics	outputs TXT file of x-y axis coordinates
       -u/--unique	TSV file's genes have a terminal modifier
+      -n/--names    TSV file includes a column with gene names
+      Notice   -n/--names flag adds to parsing time due to api call
       --help	shows options and file types
 
     Primary line: knext mixed [Input]
@@ -49,6 +52,8 @@ Usage
       -r/--results	file or folder where output should be stored
       -g/--graphics	outputs TXT file of x-y axis coordinates
       -u/--unique	TSV file's genes have a terminal modifier
+      -n/--names TSV file includes a column with compound, gene, and pathway names
+      Notice   -n/--names flag adds to parsing time due to api call
       --help	shows options and file types
 
     Primary line: knext convert [OPTIONS]

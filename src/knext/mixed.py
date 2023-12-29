@@ -6,10 +6,13 @@
 @desc: File for obtaining mixed pathway output
 """
 
+import re
 import json
 import typer
+import numpy as np
 import pandas as pd
 from pathlib import Path
+import urllib.request as request
 from itertools import combinations
 import xml.etree.ElementTree as ET
 from collections import defaultdict
@@ -78,7 +81,57 @@ def graphics_dict(root):
         graphics_dict[key] = tuple(items)
     return graphics_dict
 
-def mixed_file(input_data: str, wd: Path, unique: bool = False, graphics: bool = False):
+def names_dict(root, organism, conversion_dictionary):
+    # d = conv_dict_unique(root)
+    # d = conv_dict(root)
+    e1 = []
+    e2 = []
+    for entry in root.findall('relation'):
+        e1.append(entry.get('entry1'))
+        e2.append(entry.get('entry2'))
+    e = e1 + e2
+    e_list = [conversion_dictionary[entry].split(' ') for entry in e]
+    e_list1 = [l for sublist in e_list for l in sublist]
+    e_conv = set(e_list1)
+    dd = {}
+    for n in e_conv:
+        # Uses organism code since there are pathways, undefined, and others that will cause
+        # an error if used here
+        if n.startswith(organism):
+            # Remove, if necessary, any terminal modifiers to avoid an error in api call
+            n4url = re.sub(r'-[0-9]+', '', n)
+            # Uses find to get gene info since other api tools give error
+            url = 'https://rest.kegg.jp/find/genes/%s/'
+            response = request.urlopen(url % n4url).read().decode('utf-8')
+            split_response = response.split('\n')
+            # Find only the query gene if given back several accessions that are similar
+            s = filter(lambda x: x.startswith(n4url + '\t'), split_response)
+            # Adds to dictionary the end entry, which is the written out name
+            dd[n] = re.sub('^ ', '', list(s)[0].split(';')[1])
+        # Only obtains compounds
+        elif n.startswith('cpd:'):
+            # Remove terminal modifiers, which are always added to compounds
+            # unless a non-unique mixed pathway is chosen
+            n4url = re.sub(r'-[0-9]+', '', n)
+            # Uses find to get gene info since other api tools give error
+            url = 'https://rest.kegg.jp/find/compound/%s'
+            response = request.urlopen(url % n4url).read().decode('utf-8')
+            subbed_response = re.sub(r'%s\t' % n4url, '', response)
+            # Find only the query gene if given back several accessions that are similar
+            split_response = re.sub('^ ', '', subbed_response.strip('\n').split(';')[1])
+            # Adds to dictionary the end entry, which is the written out name
+            dd[n] = split_response
+        elif n.startswith('path:'):
+            n4url1 = re.sub(r'-[0-9]+', '', n)
+            n4url2 = re.sub(r'path:{}'.format(organism), '', n4url1)
+            url = 'https://rest.kegg.jp/find/pathway/%s'
+            response = request.urlopen(url % n4url2).read().decode('utf-8').strip('\n').split('\t')
+            dd[n] = response[1]
+        else:
+            dd[n] = np.nan
+    return dd
+
+def mixed_file(input_data: str, wd: Path, unique: bool = False, graphics: bool = False, names : bool = False):
     """
     Converts a folder of KGML files or a single KGML file into a weighted
     edgelist of mixed genes, compounds, and pathways that can be used in graph 
@@ -208,7 +261,7 @@ def mixed_file(input_data: str, wd: Path, unique: bool = False, graphics: bool =
                 pos_dict2[rows['entry2']] = rows['pos2']
             pos = pos_dict1 | pos_dict2
             json_dict = json.dumps(pos)
-            with open(wd / '{}_graphics.txt'.format(Path(graphics).name), 'w') as outfile:
+            with open(wd / '{}_graphics.txt'.format(pathway), 'w') as outfile:
                 outfile.write(json_dict)
             
             dft = df_out.groupby(['entry1', 'entry2'])['type'].apply(list).reset_index()
@@ -220,7 +273,21 @@ def mixed_file(input_data: str, wd: Path, unique: bool = False, graphics: bool =
             dfx['type'] = dft['type'].agg(','.join)
             # Ensures independently parsed cliques overwrite the cliques, which inherited neighbor weights
             xdf = pd.concat([dfx, cliquedf]).drop_duplicates(subset = ['entry1', 'entry2'], keep = 'last')
-            xdf.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
+            # Removes unneccessary extra "OR" edges connecting to each other from the final dataframe
+            # Comment out and remove the 1 from the rest of the dataframes if you want to see their 
+            # interaction in the final dataframe, but these are not meant to interact
+            xdf_out = xdf[xdf.name != 'clique']
+            if names:
+                names_dictionary = names_dict(root, root.get('org'), conversion_dictionary)
+                xdf_out['entry1_name'] = xdf_out.entry1.map(names_dictionary)
+                xdf_out['entry2_name'] = xdf_out.entry2.map(names_dictionary)
+                # Cleans up the dataframe for the entry name to be closer
+                # to the entry accession code
+                xdf_out.insert(1, 'entry1_name', xdf_out.pop('entry1_name'))
+                xdf_out.insert(3, 'entry2_name', xdf_out.pop('entry2_name'))
+                xdf_out.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
+            else:
+                xdf_out.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
     else:
         typer.echo(f'Now parsing: {title}...')
            
@@ -329,9 +396,23 @@ def mixed_file(input_data: str, wd: Path, unique: bool = False, graphics: bool =
             dfx['type'] = dft['type'].agg(','.join)
             # Ensures independently parsed cliques overwrite the cliques, which inherited neighbor weights
             xdf = pd.concat([dfx, cliquedf]).drop_duplicates(subset = ['entry1', 'entry2'], keep = 'last')
-            xdf.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
+            # Removes unneccessary extra "OR" edges connecting to each other from the final dataframe
+            # Comment out and remove the 1 from the rest of the dataframes if you want to see their 
+            # interaction in the final dataframe, but these are not meant to interact
+            xdf_out = xdf[xdf.name != 'clique']
+            if names:
+                names_dictionary = names_dict(root, root.get('org'), conversion_dictionary)
+                xdf_out['entry1_name'] = xdf_out.entry1.map(names_dictionary)
+                xdf_out['entry2_name'] = xdf_out.entry2.map(names_dictionary)
+                # Cleans up the dataframe for the entry name to be closer
+                # to the entry accession code
+                xdf_out.insert(1, 'entry1_name', xdf_out.pop('entry1_name'))
+                xdf_out.insert(3, 'entry2_name', xdf_out.pop('entry2_name'))
+                xdf_out.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
+            else:
+                xdf_out.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
 
-def mixed_folder(input_data: str, wd: Path, unique: bool = False, graphics: bool = False):
+def mixed_folder(input_data: str, wd: Path, unique: bool = False, graphics: bool = False, names: bool = False):
     for file in Path(input_data).glob('*.xml'):
         tree = ET.parse(file)
         root = tree.getroot()
@@ -475,7 +556,21 @@ def mixed_folder(input_data: str, wd: Path, unique: bool = False, graphics: bool
                 dfx['type'] = dft['type'].agg(','.join)
                 # Ensures independently parsed cliques overwrite the cliques, which inherited neighbor weights
                 xdf = pd.concat([dfx, cliquedf]).drop_duplicates(subset = ['entry1', 'entry2'], keep = 'last')
-                xdf.to_csv(output_path / '{}.tsv'.format(pathway), sep = '\t', index = False)
+                # Removes unneccessary extra "OR" edges connecting to each other from the final dataframe
+                # Comment out and remove the 1 from the rest of the dataframes if you want to see their 
+                # interaction in the final dataframe, but these are not meant to interact
+                xdf_out = xdf[xdf.name != 'clique']
+                if names:
+                    names_dictionary = names_dict(root, root.get('org'), conversion_dictionary)
+                    xdf_out['entry1_name'] = xdf_out.entry1.map(names_dictionary)
+                    xdf_out['entry2_name'] = xdf_out.entry2.map(names_dictionary)
+                    # Cleans up the dataframe for the entry name to be closer
+                    # to the entry accession code
+                    xdf_out.insert(1, 'entry1_name', xdf_out.pop('entry1_name'))
+                    xdf_out.insert(3, 'entry2_name', xdf_out.pop('entry2_name'))
+                    xdf_out.to_csv(output_path / '{}.tsv'.format(pathway), sep = '\t', index = False)
+                else:
+                    xdf_out.to_csv(output_path / '{}.tsv'.format(pathway), sep = '\t', index = False)
         else:
             output_path = wd / 'kegg_mixed_network_{}'.format(species)
             output_path.mkdir(exist_ok = True)
@@ -591,7 +686,21 @@ def mixed_folder(input_data: str, wd: Path, unique: bool = False, graphics: bool
                 dfx['type'] = dft['type'].agg(','.join)
                 # Ensures independently parsed cliques overwrite the cliques, which inherited neighbor weights
                 xdf = pd.concat([dfx, cliquedf]).drop_duplicates(subset = ['entry1', 'entry2'], keep = 'last')
-                xdf.to_csv(output_path / '{}.tsv'.format(pathway), sep = '\t', index = False)
+                # Removes unneccessary extra "OR" edges connecting to each other from the final dataframe
+                # Comment out and remove the 1 from the rest of the dataframes if you want to see their 
+                # interaction in the final dataframe, but these are not meant to interact
+                xdf_out = xdf[xdf.name != 'clique']
+                if names:
+                    names_dictionary = names_dict(root, root.get('org'), conversion_dictionary)
+                    xdf_out['entry1_name'] = xdf_out.entry1.map(names_dictionary)
+                    xdf_out['entry2_name'] = xdf_out.entry2.map(names_dictionary)
+                    # Cleans up the dataframe for the entry name to be closer
+                    # to the entry accession code
+                    xdf_out.insert(1, 'entry1_name', xdf_out.pop('entry1_name'))
+                    xdf_out.insert(3, 'entry2_name', xdf_out.pop('entry2_name'))
+                    xdf_out.to_csv(output_path / '{}.tsv'.format(pathway), sep = '\t', index = False)
+                else:
+                    xdf_out.to_csv(output_path / '{}.tsv'.format(pathway), sep = '\t', index = False)
 
 
 

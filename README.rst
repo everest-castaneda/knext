@@ -39,7 +39,7 @@ Usage
       -g/--graphics	outputs TXT file of x-y axis coordinates
       -u/--unique	TSV file's genes have a terminal modifier
       -n/--names    TSV file includes a column with gene names
-      Notice   -n/--names flag adds to parsing time due to api call
+		    Notice: increases parsing time and internet connection required
       --help	shows options and file types
 
     Primary line: knext mixed [Input]
@@ -53,7 +53,7 @@ Usage
       -g/--graphics	outputs TXT file of x-y axis coordinates
       -u/--unique	TSV file's genes have a terminal modifier
       -n/--names TSV file includes a column with compound, gene, and pathway names
-      Notice   -n/--names flag adds to parsing time due to api call
+		 Notice: increases parsing time and internet connection required
       --help	shows options and file types
 
     Primary line: knext convert [OPTIONS]
@@ -138,7 +138,7 @@ Data Frames
 Installation
 ------------
 
-The current release is :code:`v1.2`
+The current release is :code:`v1.2.1`
 Installation is via pip:
 
 .. code:: bash

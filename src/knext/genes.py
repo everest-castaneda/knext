@@ -110,7 +110,7 @@ def names_dict(root, organism, conversion_dictionary):
                 dd[n] = re.sub('^ ', '', list(s)[0].split(';')[1])
             except IndexError:
                 # Some genes only have a name and no description
-                n = split_response[0].split('\t')[1]
+                dd[n] = split_response[0].split('\t')[1]
         # Only obtains compounds
         elif n.startswith('cpd:'):
             # Remove terminal modifiers, which are always added to compounds

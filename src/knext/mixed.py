@@ -106,8 +106,12 @@ def names_dict(root, organism, conversion_dictionary):
             split_response = response.split('\n')
             # Find only the query gene if given back several accessions that are similar
             s = filter(lambda x: x.startswith(n4url + '\t'), split_response)
-            # Adds to dictionary the end entry, which is the written out name
-            dd[n] = re.sub('^ ', '', list(s)[0].split(';')[1])
+            try:
+                # Adds to dictionary the end entry, which is the written out name
+                dd[n] = re.sub('^ ', '', list(s)[0].split(';')[1])
+            except IndexError:
+                # Some genes only have a name and no description
+                n = split_response[0].split('\t')[1]
         # Only obtains compounds
         elif n.startswith('cpd:'):
             # Remove terminal modifiers, which are always added to compounds
@@ -117,8 +121,12 @@ def names_dict(root, organism, conversion_dictionary):
             url = 'https://rest.kegg.jp/find/compound/%s'
             response = request.urlopen(url % n4url).read().decode('utf-8')
             subbed_response = re.sub(r'%s\t' % n4url, '', response)
-            # Find only the query gene if given back several accessions that are similar
-            split_response = re.sub('^ ', '', subbed_response.strip('\n').split(';')[1])
+            try:
+                # Find only the query compound if given back several accessions that are similar
+                split_response = re.sub('^ ', '', subbed_response.strip('\n').split(';')[1])
+            except IndexError:
+                # Some compounds only have one name
+                split_response = subbed_response.strip('\n')
             # Adds to dictionary the end entry, which is the written out name
             dd[n] = split_response
         elif n.startswith('path:'):
@@ -126,7 +134,11 @@ def names_dict(root, organism, conversion_dictionary):
             n4url2 = re.sub(r'path:{}'.format(organism), '', n4url1)
             url = 'https://rest.kegg.jp/find/pathway/%s'
             response = request.urlopen(url % n4url2).read().decode('utf-8').strip('\n').split('\t')
-            dd[n] = response[1]
+            try:
+                dd[n] = response[1]
+            except IndexError:
+                # One pathway has no metadata and gives an error if line not included
+                dd[n] = np.nan
         else:
             dd[n] = np.nan
     return dd

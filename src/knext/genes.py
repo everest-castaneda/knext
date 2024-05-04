@@ -72,6 +72,8 @@ class GenesInteractionParser:
         df=df[0].str.split("\t", expand=True).rename({0: 'entry1',1: 'entry2',
                                                       2: 'types', 3:'name',
                                                       4: 'value'}, axis='columns')
+        # reorder columns as entry1, entry2, types, value, name
+        df = df[['entry1', 'entry2', 'types', 'value', 'name']]
         # convert compound value to kegg id if only relation.type is "compound"
         def apply_conversion(row):
             if row['name'] == 'compound':
@@ -219,9 +221,9 @@ class GenesInteractionParser:
         dfv = df_out.groupby(['entry1', 'entry2'])['value'].apply(list).reset_index()
         dfn = df_out.groupby(['entry1', 'entry2'])['name'].apply(list).reset_index()
         dfx = dft
+        dfx['type'] = dft['type'].agg(','.join)
         dfx['value'] = dfv['value'].agg(','.join)
         dfx['name'] = dfn['name'].agg(','.join)
-        dfx['type'] = dft['type'].agg(','.join)
         # Ensures independently parsed cliques overwrite the cliques, which inherited neighbor weights
         xdf = pd.concat([dfx, cliquedf]).drop_duplicates(subset = ['entry1', 'entry2'], keep = 'last')
         return  xdf

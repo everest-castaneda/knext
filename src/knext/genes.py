@@ -119,7 +119,8 @@ def names_dict(root, organism, conversion_dictionary):
             dd[n] = np.nan
     return dd
 
-
+class FileNotFound(Exception):
+    pass
 
 class GenesInteractionParser:
 
@@ -143,6 +144,8 @@ class GenesInteractionParser:
         '''
         This function takes the root of elementTree and returns an edgelist
         '''
+        pathway_link = self.root.get('link')
+
         d = []
         for relation in self.root.findall('relation'):
             for subtype in relation:
@@ -163,7 +166,7 @@ class GenesInteractionParser:
         df=pd.DataFrame(edgelist)
         if df.empty:
             # throw error if no edges are found
-            raise Exception(f'File "{self.input_data}" cannot be parsed.\nVisit {self.pathway_link} for pathway details.\nThere are likely no edges in which to parse...')
+            raise FileNotFound(f'File "{self.input_data}" cannot be parsed.\nVisit {pathway_link} for pathway details.\nThere are likely no edges in which to parse...')
 
         df=df[0].str.split("\t", expand=True).rename({0: 'entry1',1: 'entry2',
                                                       2: 'types', 3:'name',
@@ -396,9 +399,13 @@ def genes_parser(input_data: str, wd: Path, compound:bool = False, unique: bool 
     '''
     if Path(input_data).is_dir():
         for file in Path(input_data).glob('*.xml'):
-            gip = GenesInteractionParser(input_data, wd, compound=compound,
-                                         unique=unique, graphics=graphics, names=names)
-            gip.genes_file()
+            try:
+                gip = GenesInteractionParser(file, wd, compound=compound,
+                                             unique=unique, graphics=graphics, names=names)
+                gip.genes_file()
+            except FileNotFound as e:
+                typer.echo(e)
+                continue
     else:
         gip = GenesInteractionParser(input_data, wd, compound=compound,
                                      unique=unique, graphics=graphics, names=names)

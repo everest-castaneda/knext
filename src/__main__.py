@@ -48,14 +48,7 @@ def get_kgml(species, results):
         results.mkdir(exist_ok = True)
         kgml(species, results)
 
-@cli.command()
-@click.argument('input_data')
-@click.option('-r', '--results', required = False)
-@click.option('-c', '--compound', default = False, is_flag = True)
-@click.option('-u', '--unique', default = False, is_flag = True)
-@click.option('-g', '--graphics', default = False, is_flag = True)
-@click.option('-n', '--names', default = False, is_flag = True)
-def genes(input_data: str, results: str, compound:bool, unique: bool, graphics: bool, names: bool):
+def parse(input_data: str, results: str, mixed:bool, unique: bool, graphics: bool, names: bool):
     """
     Converts a folder of KGML files or a single KGML file into a weighted
     edgelist of genes that can be used in graph analysis. If -u/--unique flag
@@ -79,7 +72,26 @@ def genes(input_data: str, results: str, compound:bool, unique: bool, graphics: 
         else:
             wd = Path(results)
 
-    genes_parser(input_data, wd, compound, unique, graphics, names)
+    genes_parser(input_data, wd, mixed=mixed, unique=unique, graphics=graphics, names=names)
+
+@cli.command()
+@click.argument('input_data')
+@click.option('-r', '--results', required = False)
+@click.option('-u', '--unique', default = False, is_flag = True)
+@click.option('-g', '--graphics', default = False, is_flag = True)
+@click.option('-n', '--names', default = False, is_flag = True)
+def genes(input_data: str, results: str, compound:bool, unique: bool, graphics: bool, names: bool):
+    """
+    Converts a folder of KGML files or a single KGML file into a weighted
+    edgelist of genes that can be used in graph analysis. If -u/--unique flag
+    is used genes are returned with terminal modifiers to enhance network
+    visualization or analysis. If the -g/--graphics flag is used, x-y
+    coordinates of pathways are returned, which may be used as positions in
+    NetworkX\'s graph drawing commands.
+    """
+    # work as a wrapper function with mixed=False call parse function parse the file(s)
+    parse(input_data, results=results, mixed=False,
+          unique=unique, graphics=graphics, names=names)
 
 
 @cli.command()
@@ -97,98 +109,8 @@ def mixed(input_data: str, results: str, unique: bool = False, graphics: bool = 
     -g/--graphics flag is used, x-y coordinates of pathways are returned, 
     which may be used as positions in NetworkX\'s graph drawing commands.
     """
-    if Path.exists(Path(input_data)) == False:
-        typer.echo('Please input a directory of KGML files or an individual KGML file...')
-        sys.exit()
-    else:
-        if results:
-            if Path.exists(Path(results)) == False:
-                typer.echo('Directory not found.\nPlease input a directory in which to save the results...')
-            else:
-                wd = Path(results)
-                if graphics and unique and names:
-                    if Path(input_data).is_file():
-                        mixed_file(input_data, wd, unique = True, graphics = True, names = True)
-                    else:
-                        mixed_folder(input_data, wd, unique = True, graphics = True, names = True)
-                elif graphics and unique and not names:
-                    if Path(input_data).is_file():
-                        mixed_file(input_data, wd, graphics = True, unique = True)
-                    else:
-                        mixed_folder(input_data, wd, graphics = True, unique = True)
-                elif graphics and names and not unique:
-                    if Path(input_data).is_file():
-                        mixed_file(input_data, wd, graphics = True, names = True)
-                    else:
-                        mixed_folder(input_data, wd, graphics = True, names = True)
-                elif graphics and not unique and not names:
-                    if Path(input_data).is_file():
-                        mixed_file(input_data, wd, graphics = True)
-                    else:
-                        mixed_folder(input_data, wd, graphics = True)
-                elif unique and names and not graphics:
-                    if Path(input_data).is_file():
-                        mixed_file(input_data, wd, unique = True, names = True)
-                    else:
-                        mixed_folder(input_data, wd, unique = True, names = True)
-                elif unique and not names and not graphics:
-                    if Path(input_data).is_file():
-                        mixed_file(input_data, wd, unique = True)
-                    else:
-                        mixed_folder(input_data, wd, unique = True)
-                elif names and not unique and not graphics:
-                    if Path(input_data).is_file():
-                        mixed_file(input_data, wd, names = True)
-                    else:
-                        mixed_folder(input_data, wd, names = True)
-                else:
-                    if Path(input_data).is_file():
-                        mixed_file(input_data, wd)
-                    else:
-                        mixed_folder(input_data, wd)
-        else:
-            wd = Path.cwd()
-            typer.echo(f'No output directory given. All resulting files or folders will be saved to current directory:\n{wd}\n')
-            if graphics and unique and names:
-                if Path(input_data).is_file():
-                    mixed_file(input_data, wd, unique = True, graphics = True, names = True)
-                else:
-                    mixed_folder(input_data, wd, unique = True, graphics = True, names = True)
-            elif graphics and unique and not names:
-                if Path(input_data).is_file():
-                    mixed_file(input_data, wd, graphics = True, unique = True)
-                else:
-                    mixed_folder(input_data, wd, graphics = True, unique = True)
-            elif graphics and names and not unique:
-                if Path(input_data).is_file():
-                    mixed_file(input_data, wd, graphics = True, names = True)
-                else:
-                    mixed_folder(input_data, wd, graphics = True, names = True)
-            elif graphics and not unique and not names:
-                if Path(input_data).is_file():
-                    mixed_file(input_data, wd, graphics = True)
-                else:
-                    mixed_folder(input_data, wd, graphics = True)
-            elif unique and names and not graphics:
-                if Path(input_data).is_file():
-                    mixed_file(input_data, wd, unique = True, names = True)
-                else:
-                    mixed_folder(input_data, wd, unique = True, names = True)
-            elif unique and not names and not graphics:
-                if Path(input_data).is_file():
-                    mixed_file(input_data, wd, unique = True)
-                else:
-                    mixed_folder(input_data, wd, unique = True)
-            elif names and not unique and not graphics:
-                if Path(input_data).is_file():
-                    mixed_file(input_data, wd, names = True)
-                else:
-                    mixed_folder(input_data, wd, names = True)
-            else:
-                if Path(input_data).is_file():
-                    mixed_file(input_data, wd)
-                else:
-                    mixed_folder(input_data, wd)
+    # work as a wrapper function with mixed=True call parse function parse the file(s)
+    parse(input_data, results=results, mixed = True, unique = unique, graphics = graphics, names = names)
 
 @cli.command()
 @click.argument('species')

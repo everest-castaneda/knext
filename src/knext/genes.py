@@ -16,118 +16,19 @@ import urllib.request as request
 from itertools import combinations
 import xml.etree.ElementTree as ET
 from collections import defaultdict
-
 from knext import utils
 
 
-def conv_dict(root):
-    # This dictionary is the default option
-    # Only compounds are unique
-    entry_id, entry_name, entry_type = utils._parse_entries(root)
-
-    unique_compound = []
-    for i in range(0, len(entry_id)):
-        c = [name + '-' + entry_id[i] if name.startswith('cpd:') or name == 'undefined' else name for name in entry_name[i].split()]
-        unique_compound.append(' '.join(c))
-
-    conversion_dictionary = dict(zip(entry_id, unique_compound))
-    return conversion_dictionary
-
-def conv_dict_unique(root):
-    # This dictionary is the unique version
-    # Every item is unique to reveal subgraphs
-    entry_id, entry_name, entry_type = utils._parse_entries(root)
-
-    unique_name = []
-    for i in range(0, len(entry_id)):
-        e = [name + '-' + entry_id[i] for name in entry_name[i].split()]
-        unique_name.append(' '.join(e))
-
-    conversion_dictionary = dict(zip(entry_id, unique_name))
-    return conversion_dictionary
-
-def graphics_dict(root):
-    entry_dict = defaultdict(list)
-    for entry in root.findall('entry'):
-        for graphics in entry.find('graphics').items():
-            if graphics[0] == 'x' or graphics[0] == 'y':
-                entry_dict[entry.attrib['id']].append(int(graphics[1]))
-    graphics_dict = {}
-    for key, items in entry_dict.items():
-        graphics_dict[key] = tuple(items)
-    return graphics_dict
-
-def names_dict(root, organism, conversion_dictionary):
-    # d = conv_dict_unique(root)
-    # d = conv_dict(root)
-    e1 = []
-    e2 = []
-    for entry in root.findall('relation'):
-        e1.append(entry.get('entry1'))
-        e2.append(entry.get('entry2'))
-    e = e1 + e2
-    e_list = [conversion_dictionary[entry].split(' ') for entry in e]
-    e_list1 = [l for sublist in e_list for l in sublist]
-    e_conv = set(e_list1)
-    dd = {}
-    for n in e_conv:
-        # Uses organism code since there are pathways, undefined, and others that will cause
-        # an error if used here
-        if n.startswith(organism):
-            # Remove, if necessary, any terminal modifiers to avoid an error in api call
-            n4url = re.sub(r'-[0-9]+', '', n)
-            # Uses find to get gene info since other api tools give error
-            url = 'https://rest.kegg.jp/find/genes/%s/'
-            response = request.urlopen(url % n4url).read().decode('utf-8')
-            split_response = response.split('\n')
-            # Find only the query gene if given back several accessions that are similar
-            s = filter(lambda x: x.startswith(n4url + '\t'), split_response)
-            try:
-                # Adds to dictionary the end entry, which is the written out name
-                dd[n] = re.sub('^ ', '', list(s)[0].split(';')[1])
-            except IndexError:
-                # Some genes only have a name and no description
-                dd[n] = split_response[0].split('\t')[1]
-        # Only obtains compounds
-        elif n.startswith('cpd:'):
-            # Remove terminal modifiers, which are always added to compounds
-            # unless a non-unique mixed pathway is chosen
-            n4url = re.sub(r'-[0-9]+', '', n)
-            # Uses find to get gene info since other api tools give error
-            url = 'https://rest.kegg.jp/find/compound/%s'
-            response = request.urlopen(url % n4url).read().decode('utf-8')
-            subbed_response = re.sub(r'%s\t' % n4url, '', response)
-            try:
-                # Find only the query compound if given back several accessions that are similar
-                split_response = re.sub('^ ', '', subbed_response.strip('\n').split(';')[1])
-            except IndexError:
-                # Some compounds only have one name
-                split_response = subbed_response.strip('\n')
-            # Adds to dictionary the end entry, which is the written out name
-            dd[n] = split_response
-        elif n.startswith('path:'):
-            n4url1 = re.sub(r'-[0-9]+', '', n)
-            n4url2 = re.sub(r'path:{}'.format(organism), '', n4url1)
-            url = 'https://rest.kegg.jp/find/pathway/%s'
-            response = request.urlopen(url % n4url2).read().decode('utf-8').strip('\n').split('\t')
-            try:
-                dd[n] = response[1]
-            except IndexError:
-                # One pathway has no metadata and gives an error if line not included
-                dd[n] = np.nan
-        else:
-            dd[n] = np.nan
-    return dd
 
 class FileNotFound(Exception):
     pass
 
 class GenesInteractionParser:
 
-    def __init__(self, input_data: str, wd: Path, compound:bool = False, unique: bool = False, graphics: bool = False, names: bool = False):
+    def __init__(self, input_data: str, wd: Path, mixed:bool = False, unique: bool = False, graphics: bool = False, names: bool = False):
         self.input_data = input_data
         self.wd = wd
-        self.compound = compound
+        self.mixed = mixed
         self.unique = unique
         self.graphics = graphics
         self.names = names
@@ -172,7 +73,7 @@ class GenesInteractionParser:
                                                       2: 'types', 3:'name',
                                                       4: 'value'}, axis='columns')
         # convert value to kegg id
-        df['value'] = df['value'].map(self.conversion_dictionary)
+        # df['value'] = df['value'].map(self.conversion_dictionary)
         # Convert entry1 and entry2 id to kegg id
         df['entry1'] = df['entry1'].map(self.conversion_dictionary)
         df['entry2'] = df['entry2'].map(self.conversion_dictionary)
@@ -184,16 +85,16 @@ class GenesInteractionParser:
 
     def _get_conversion_dictionary(self):
         if self.unique:
-            conversion_dictionary = conv_dict_unique(self.root)
+            conversion_dictionary = utils.conv_dict_unique(self.root)
         else:
-            conversion_dictionary = conv_dict(self.root)
+            conversion_dictionary = utils.conv_dict(self.root)
         return conversion_dictionary
 
     def _get_names_dictionary(self, conversion_dictionary):
         '''
         Get the names dictionary for the given GenesInteractionParser object
         '''
-        names_dictionary = names_dict(self.root, self.root.get('org'), conversion_dictionary)
+        names_dictionary = utils.names_dict(self.root, self.root.get('org'), conversion_dictionary)
         return self.names_dictionary
 
 
@@ -350,7 +251,7 @@ class GenesInteractionParser:
         df = self._get_edges()
 
         if self.graphics:
-            graphics = graphics_dict(self.root)
+            graphics = utils.graphics_dict(self.root)
             df['pos1'] = df['entry1'].map(graphics)
             df['pos2'] = df['entry2'].map(graphics)
 
@@ -363,18 +264,21 @@ class GenesInteractionParser:
 
 
 
-        # remove edge with "path" entries
-        xdf = xdf[(~xdf['entry1'].str.startswith('path')) &
-                      (~xdf['entry2'].str.startswith('path'))]
+
         # Check for compounds or undefined nodes
         has_compounds_or_undefined = not xdf[(xdf['entry1'].str.startswith('cpd:')) | (xdf['entry2'].str.startswith('cpd:')) | (xdf['entry1'].str.startswith('undefined')) | (xdf['entry2'].str.startswith('undefined'))].empty
 
-        if has_compounds_or_undefined and not self.compound:
-            xdf = self._propagate_compounds(xdf)
-            xdf = xdf[xdf.name != 'clique']
-            if self.names:
-                xdf['entry1_name'] = xdf.entry1.map(self.names_dictionary)
-            xdf.to_csv(self.wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
+        if not self.mixed:
+            # remove edge with "path" entries
+            xdf = xdf[(~xdf['entry1'].str.startswith('path')) &
+                      (~xdf['entry2'].str.startswith('path'))]
+            if has_compounds_or_undefined:
+
+                xdf = self._propagate_compounds(xdf)
+                xdf = xdf[xdf.name != 'clique']
+                if self.names:
+                    xdf['entry1_name'] = xdf.entry1.map(self.names_dictionary)
+                xdf.to_csv(self.wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
         else:
             xdf = xdf[xdf.name != 'clique']
             if self.names:
@@ -398,7 +302,7 @@ class GenesInteractionParser:
 
 
 
-def genes_parser(input_data: str, wd: Path, compound:bool = False, unique: bool = False, graphics: bool = False, names: bool = False):
+def genes_parser(input_data: str, wd: Path, mixed:bool = False, unique: bool = False, graphics: bool = False, names: bool = False):
     '''
     Converts a folder of KGML files or a single KGML file into a weighted
     edgelist of genes that can be used in graph analysis.
@@ -406,13 +310,13 @@ def genes_parser(input_data: str, wd: Path, compound:bool = False, unique: bool 
     if Path(input_data).is_dir():
         for file in Path(input_data).glob('*.xml'):
             try:
-                gip = GenesInteractionParser(file, wd, compound=compound,
+                gip = GenesInteractionParser(file, wd, mixed=mixed,
                                              unique=unique, graphics=graphics, names=names)
                 gip.genes_file()
             except FileNotFound as e:
                 typer.echo(e)
                 continue
     else:
-        gip = GenesInteractionParser(input_data, wd, compound=compound,
+        gip = GenesInteractionParser(input_data, wd, mixed=mixed,
                                      unique=unique, graphics=graphics, names=names)
         gip.genes_file()

@@ -17,23 +17,13 @@ from itertools import combinations
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 
+from knext import utils
+
+
 def conv_dict(root):
     # This dictionary is the default option
     # Only compounds are unique
-    entry_dict = defaultdict(list)
-    for entries in root.findall('entry'):
-        for key, items in entries.attrib.items():
-            entry_dict[key].append(items)
-
-    entry_id=[]
-    entry_name=[]
-    for key, items in entry_dict.items():
-        if key == 'id':
-            for i in items:
-                entry_id.append(i)
-        if key == 'name':
-            for i in items:
-                entry_name.append(i)
+    entry_id, entry_name, entry_type = utils._parse_entries(root)
 
     unique_compound = []
     for i in range(0, len(entry_id)):
@@ -46,20 +36,7 @@ def conv_dict(root):
 def conv_dict_unique(root):
     # This dictionary is the unique version
     # Every item is unique to reveal subgraphs
-    entry_dict = defaultdict(list)
-    for entries in root.findall('entry'):
-        for key, items in entries.attrib.items():
-            entry_dict[key].append(items)
-
-    entry_id=[]
-    entry_name=[]
-    for key, items in entry_dict.items():
-        if key == 'id':
-            for i in items:
-                entry_id.append(i)
-        if key == 'name':
-            for i in items:
-                entry_name.append(i)
+    entry_id, entry_name, entry_type = utils._parse_entries(root)
 
     unique_name = []
     for i in range(0, len(entry_id)):
@@ -142,43 +119,32 @@ def names_dict(root, organism, conversion_dictionary):
             dd[n] = np.nan
     return dd
 
-def genes_file(input_data: str, wd, compound:bool = False, unique: bool = False, graphics: bool = False, names: bool = False):
-    """
-    Converts a folder of KGML files or a single KGML file into a weighted
-    edgelist of genes that can be used in graph analysis. If -u/--unique flag
-    is used genes are returned with terminal modifiers to enhance network
-    visualization or analysis. If the -g/--graphics flag is used, x-y
-    coordinates of pathways are returned, which may be used as positions in
-    NetworkX\'s graph drawing commands.
-    input_data: str: Path to KGML file or folder of KGML files
-    wd: Path: Path to working directory
-    unique: bool: Flag to return unique gene names
-    """
-    tree = ET.parse(input_data)
-    root = tree.getroot()
 
-    title = root.get('title')
-    pathway = root.get('name').replace('path:', '')
-    pathway_link = root.get('link')
-    if graphics:
-        # Graphics
-        graphics = graphics_dict(root)
 
-        typer.echo(f'Now parsing: {title}...')
+class GenesInteractionParser:
 
-        e1 = []
-        e2 = []
-        n = []
-        v = []
-        for relation in root.findall('relation'):
-            e1.append(relation.get('entry1'))
-            e2.append(relation.get('entry2'))
-            for subtype in relation.findall('subtype'):
-                n.append(subtype.get('name'))
-                v.append(subtype.get('value'))
+    def __init__(self, input_data: str, wd: Path, compound:bool = False, unique: bool = False, graphics: bool = False, names: bool = False):
+        self.input_data = input_data
+        self.wd = wd
+        self.compound = compound
+        self.unique = unique
+        self.graphics = graphics
+        self.names = names
 
+        tree = ET.parse(input_data)
+        self.root = tree.getroot()
+
+        self.conversion_dictionary = self._get_conversion_dictionary()
+        if self.names:
+            self.names_dictionary = self._get_names_dictionary(self.conversion_dictionary)
+
+
+    def _get_edges(self):
+        '''
+        This function takes the root of elementTree and returns an edgelist
+        '''
         d = []
-        for relation in root.findall('relation'):
+        for relation in self.root.findall('relation'):
             for subtype in relation:
                 d1=relation.attrib
                 d2=subtype.attrib
@@ -186,9 +152,6 @@ def genes_file(input_data: str, wd, compound:bool = False, unique: bool = False,
                 d.append(d3)
 
         edgelist=[]
-        # Takes json dictionary and removes formatting in order to obtain an edgelist
-        # This odd line of code is necessary  because of the various nested and non-nested subtypes
-        # This allows for edges to inherit weights from a nested subtype
         for line in d:
             x=line[0].replace("{","").replace("}","").replace('"entry1":',"") \
                 .replace('"entry2":',"").replace('"type":',"").replace('"name":',"") \
@@ -198,415 +161,245 @@ def genes_file(input_data: str, wd, compound:bool = False, unique: bool = False,
             edgelist.append(x+"\t"+y)
 
         df=pd.DataFrame(edgelist)
-
         if df.empty:
-            typer.echo(f'File "{input_data}" cannot be parsed.\nVisit {pathway_link} for pathway details.\nThere are likely no edges in which to parse...')
+            # throw error if no edges are found
+            raise Exception(f'File "{self.input_data}" cannot be parsed.\nVisit {self.pathway_link} for pathway details.\nThere are likely no edges in which to parse...')
+
+        df=df[0].str.split("\t", expand=True).rename({0: 'entry1',1: 'entry2',
+                                                      2: 'types', 3:'name',
+                                                      4: 'value'}, axis='columns')
+        # Convert entry1 and entry2 id to kegg id
+        df['entry1'] = df['entry1'].map(self.conversion_dictionary)
+        df['entry2'] = df['entry2'].map(self.conversion_dictionary)
+        # Split the entry1 and entry2 into lists
+        # entry1 and entry2 can be a list of genes
+        df['entry1'] = df['entry1'].astype(str).str.split(' ', expand = False)
+        df['entry2'] = df['entry2'].astype(str).str.split(' ', expand = False)
+        return df
+
+    def _get_conversion_dictionary(self):
+        if self.unique:
+            conversion_dictionary = conv_dict_unique(self.root)
         else:
-            df=df[0].str.split("\t", expand=True).rename({0: 'entry1',1: 'entry2',
-                                                          2: 'types', 3:'name',
-                                                          4: 'value'}, axis='columns')
+            conversion_dictionary = conv_dict(self.root)
+        return conversion_dictionary
 
-            entry_dict = defaultdict(list)
-            for entries in root.findall('entry'):
-                for key, items in entries.attrib.items():
-                    entry_dict[key].append(items)
+    def _get_names_dictionary(self, conversion_dictionary):
+        '''
+        Get the names dictionary for the given GenesInteractionParser object
+        '''
+        names_dictionary = names_dict(self.root, self.root.get('org'), conversion_dictionary)
+        return self.names_dictionary
 
-            # Graphics
+
+    def _parse_clique(self, df):
+        # Parse the cliques seperate so they won't inherit neighbor weights
+        # Allows for custom weights so user knows which are customly parsed
+        clique_edges = []
+        for index, rows in df.iterrows():
+            if len(rows['entry1']) > 1:
+                cliques = [x for x in combinations(rows['entry1'], 2)]
+                cliques1 = [tup + ('type 2', 'undirectional', 'clique') for tup in cliques]
+                clique_edges.append(cliques1)
+            if len(rows['entry2']) > 1:
+                cliques = [x for x in combinations(rows['entry2'], 2)]
+                cliques2 = [tup + ('type 2', 'undirectional', 'clique') for tup in cliques]
+                clique_edges.append(cliques2)
+        clique2df = [e for edge in clique_edges for e in edge]
+        cliquedf = pd.DataFrame.from_records(clique2df, columns = ['entry1', 'entry2', 'type', 'value', 'name'])
+
+        edges = []
+        for index, rows in df.iterrows():
+            lists = rows['entry1'] + rows['entry2']
+            # Cliques here inherit neighbor weights, but will be overwritten by above
+            cliques = [x for x in combinations(lists, 2)]
+            if self.graphics:
+                network = [tup + (rows['types'], rows['value'], rows['name'], rows['pos1'], rows['pos2']) for tup in cliques]
+            else:
+                network = [tup + (rows['types'], rows['value'], rows['name']) for tup in cliques]
+            edges.append(network)
+
+        # This removes edges which contain +p (phosphorylation) these oftentimes
+        # overwrite important weight attributes while providing no vital information
+        # edges2df = [e for edge in edges for e in edge if '+p' not in e and '-p' not in e]
+
+        # Standard line for obtaining a dataframe of edges
+        edges2df = [e for edge in edges for e in edge]
+        # Create pandas DF from edges
+        if self.graphics:
+            df_out = pd.DataFrame.from_records(edges2df, columns = ['entry1', 'entry2', 'type', 'value', 'name', 'pos1', 'pos2'])
+        else:
+            df_out = pd.DataFrame.from_records(edges2df, columns = ['entry1', 'entry2', 'type', 'value', 'name'])
+        return cliquedf, df_out
+
+    def _propagate_compounds(self, xdf):
+        # These next series of steps are for propagating compounds and undefined nodes
+        # Uses networkx
+        G = nx.from_pandas_edgelist(xdf, source = 'entry1', target = 'entry2', edge_attr = 'name', create_using = nx.DiGraph())
+        new_edges = []
+        for node in G.nodes:
+            # Gather roots and leaflets
+            roots = [n for n, d in G.in_degree() if d == 0]
+            leaflets = [n for n, d in G.out_degree() if d == 0]
+            # Find compounds or undefined proteins that might need propagation
+            if node.startswith('cpd') or node.startswith('undefined'):
+                if node in roots or node in leaflets:
+                    # Passes root nodes and leaflet nodes
+                    # These do not need propagation as they terminate
+                    pass
+                else:
+                    out_edges = [e for e in G.out_edges(node)]
+                    in_edges = [e for e in G.in_edges(node)]
+                    for i in in_edges:
+                        for o in out_edges:
+                            if not i[0].startswith('cpd') and not o[1].startswith('cpd') and not i[0].startswith('undefined') and not o[1].startswith('undefined') and not i[0].startswith('path') and not o[1].startswith('path'):
+                                # Simple compound propagation removes compound between two genes
+                                # Example: hsa:xxx -> cpd:xxx -> hsa:xxx to hsa:xxx -> hsa:xxx
+                                new_edges.append([i[0], o[1], 'CPp', 'Custom', 'compound propagation'])
+                            else:
+                                # Loops through roots and leaves to find the start and end of each node that is propagated
+                                # These pathways have copious amounts of compounds and undefined genes in between the propagated genes
+                                # This loop also picks up on non-proteins that are left out if the above simple compound propagation is used
+                                for root in roots:
+                                    for leaf in leaflets:
+                                        if nx.has_path(G, root, node) == True and nx.has_path(G, node, leaf) == True:
+                                            # Uses the shortest path between the root/leaf and query node
+                                            rpath = [p for p in nx.shortest_path(G, root, node)]
+                                            lpath = [p for p in nx.shortest_path(G, node, leaf)]
+                                            # Skip paths that have no proteins
+                                            if all(node.startswith('cpd') or node.startswith('undefined') or node.startswith('path') for node in rpath) == True or all(node.startswith('cpd') or node.startswith('undefined') or node.startswith('path') for node in lpath) == True:
+                                                pass
+                                            else:
+                                                # Indexes all elements in the shortest path list that is a gene
+                                                rindex = [index for index, element in enumerate(rpath) if not element.startswith('cpd') and not element.startswith('undefined') and not element.startswith('path')]
+                                                lindex = [index for index, element in enumerate(lpath) if not element.startswith('cpd') and not element.startswith('undefined') and not element.startswith('path')]
+                                                # Here we use the maximum of the root path and the minimum of the leaf path to successfully propagate compounds
+                                                # Note below example
+                                                # [mmu:x, cpd:###, cpd:x] --> max is mmu:x
+                                                # [cpd:x, cpd:###, undefined, mmu:y, mmu:###] --> min is mmu:y
+                                                # creates edge [mmu:x, mmu:y]
+                                                new_edges.append([rpath[max(rindex)], lpath[min(lindex)], 'CPp', 'Custom', 'compound propagation'])
+        # Creates a dataframe of the new edges that are a result of compound propagation
+        new_edges_df = pd.DataFrame(new_edges, columns = ['entry1', 'entry2', 'type', 'value', 'name'])
+        # Concatenates the new edges with the edges from the above (cliques and original parsed edges)
+        df0 = pd.concat([xdf, new_edges_df])
+        # Drop any duplicated edges
+        df1 = df0.drop_duplicates()
+        # Removes compounds and undefined as they were propagated and no longer needed
+        df2 = df1[(~df1['entry1'].str.startswith('cpd')) & (~df1['entry2'].str.startswith('cpd')) & (~df1['entry1'].str.startswith('undefined')) & (~df1['entry2'].str.startswith('undefined')) & (~df1['entry1'].str.startswith('path')) & (~df1['entry2'].str.startswith('path'))]
+        # Removes unneccessary extra "OR" edges connecting to each other from the final dataframe
+        # Comment out and remove the 1 from the rest of the dataframes if you want to see their
+        # interaction in the final dataframe, but these are not meant to interact
+        return df2
+
+    def _replace_with_cliques(self, df, cliquedf, df_out):
+        '''
+        This function replaces the edges in df with the cliques in cliquedf
+        '''
+        # aggregating the 'type', 'value', and 'name' columns in df_out for each
+        # unique pair of 'entry1' and 'entry2',
+        #  joining the aggregated values into a single string,
+        # and then merging this with cliquedf while removing any duplicates.
+        dft = df_out.groupby(['entry1', 'entry2'])['type'].apply(list).reset_index()
+        dfv = df_out.groupby(['entry1', 'entry2'])['value'].apply(list).reset_index()
+        dfn = df_out.groupby(['entry1', 'entry2'])['name'].apply(list).reset_index()
+        dfx = dft
+        dfx['value'] = dfv['value'].agg(','.join)
+        dfx['name'] = dfn['name'].agg(','.join)
+        dfx['type'] = dft['type'].agg(','.join)
+        # Ensures independently parsed cliques overwrite the cliques, which inherited neighbor weights
+        xdf = pd.concat([dfx, cliquedf]).drop_duplicates(subset = ['entry1', 'entry2'], keep = 'last')
+        return  xdf
+
+    def _add_names(self, df):
+        df['entry1_name'] = df.entry1.map(self.names_dictionary)
+        df['entry2_name'] = df.entry2.map(self.names_dictionary)
+        # Cleans up the dataframe for the entry name to be closer
+        # to the entry accession code
+        df.insert(1, 'entry1_name', df.pop('entry1_name'))
+        df.insert(3, 'entry2_name', df.pop('entry2_name'))
+        return df
+
+    def genes_file(self):
+        '''
+        Converts a folder of KGML files or a single KGML file into a weighted
+        edgelist of genes that can be used in graph analysis. If -u/--unique flag
+        is used genes are returned with terminal modifiers to enhance network
+        visualization or analysis. If the -g/--graphics flag is used, x-y
+        coordinates of pathways are returned, which may be used as positions in
+        NetworkX\'s graph drawing commands.
+        input_data: str: Path to KGML file or folder of KGML files
+        wd: Path: Path to working directory
+        unique: bool: Flag to return unique gene names
+        '''
+        title = self.root.get('title')
+        pathway = self.root.get('name').replace('path:', '')
+        pathway_link = self.root.get('link')
+
+        # Common operations
+        typer.echo(f'Now parsing: {title}...')
+        df = self._get_edges()
+
+        if self.graphics:
+            graphics = graphics_dict(self.root)
             df['pos1'] = df['entry1'].map(graphics)
             df['pos2'] = df['entry2'].map(graphics)
 
-            entry_id=[]
-            entry_name=[]
-            entry_type=[]
-            for key, items in entry_dict.items():
-                if key == 'id':
-                    for i in items:
-                        entry_id.append(i)
-                if key == 'name':
-                    for i in items:
-                        entry_name.append(i)
-                if key == 'type':
-                    for i in items:
-                        entry_type.append(i)
+        cliquedf, df_out = self._parse_clique(df)
 
-            if unique:
-                conversion_dictionary = conv_dict_unique(root)
-            else:
-                conversion_dictionary = conv_dict(root)
+        if self.graphics:
+            self._parse_graphics(df, graphics, df_out)
 
-            df['entry1'] = df['entry1'].map(conversion_dictionary)
-            df['entry2'] = df['entry2'].map(conversion_dictionary)
-            df['entry1'] = df['entry1'].astype(str).str.split(' ', expand = False)
-            df['entry2'] = df['entry2'].astype(str).str.split(' ', expand = False)
+        xdf = self._replace_with_cliques(df, cliquedf, df_out)
 
-            # Parse the cliques seperate so they won't inherit neighbor weights
-            # Allows for custom weights so user knows which are customly parsed
-            clique_edges = []
-            for index, rows in df.iterrows():
-                if len(rows['entry1']) > 1:
-                    cliques = [x for x in combinations(rows['entry1'], 2)]
-                    cliques1 = [tup + ('type 2', 'undirectional', 'clique') for tup in cliques]
-                    clique_edges.append(cliques1)
-                if len(rows['entry2']) > 1:
-                    cliques = [x for x in combinations(rows['entry2'], 2)]
-                    cliques2 = [tup + ('type 2', 'undirectional', 'clique') for tup in cliques]
-                    clique_edges.append(cliques2)
-            clique2df = [e for edge in clique_edges for e in edge]
-            cliquedf = pd.DataFrame.from_records(clique2df, columns = ['entry1', 'entry2', 'type', 'value', 'name'])
 
-            edges = []
-            for index, rows in df.iterrows():
-                lists = rows['entry1'] + rows['entry2']
-                # Cliques here inherit neighbor weights, but will be overwritten by above
-                cliques = [x for x in combinations(lists, 2)]
-                network = [tup + (rows['types'], rows['value'], rows['name'], rows['pos1'], rows['pos2']) for tup in cliques]
-                edges.append(network)
 
-            # This removes edges which contain +p (phosphorylation) these oftentimes
-            # overwrite important weight attributes while providing no vital information
-            # edges2df = [e for edge in edges for e in edge if '+p' not in e and '-p' not in e]
+        # remove edge with "path" entries
+        xdf = xdf[(~xdf['entry1'].str.startswith('path')) &
+                      (~xdf['entry2'].str.startswith('path'))]
+        # Check for compounds or undefined nodes
+        has_compounds_or_undefined = not xdf[(xdf['entry1'].str.startswith('cpd:')) | (xdf['entry2'].str.startswith('cpd:')) | (xdf['entry1'].str.startswith('undefined')) | (xdf['entry2'].str.startswith('undefined'))].empty
 
-            # Standard line for obtaining a dataframe of edges
-            edges2df = [e for edge in edges for e in edge]
-            # Create pandas DF from edges
-            df_out = pd.DataFrame.from_records(edges2df, columns = ['entry1', 'entry2', 'type', 'value', 'name', 'pos1', 'pos2'])
-
-            # Graphics
-            pos_dict1 = {}
-            pos_dict2 = {}
-            for index, rows in df_out.iterrows():
-                pos_dict1[rows['entry1']] = rows['pos1']
-                pos_dict2[rows['entry2']] = rows['pos2']
-            pos = pos_dict1 | pos_dict2
-            json_dict = json.dumps(pos)
-            with open(wd / '{}_graphics.txt'.format(pathway), 'w') as outfile:
-                outfile.write(json_dict)
-
-            dft = df_out.groupby(['entry1', 'entry2'])['type'].apply(list).reset_index()
-            dfv = df_out.groupby(['entry1', 'entry2'])['value'].apply(list).reset_index()
-            dfn = df_out.groupby(['entry1', 'entry2'])['name'].apply(list).reset_index()
-            dfx = dft
-            dfx['value'] = dfv['value'].agg(','.join)
-            dfx['name'] = dfn['name'].agg(','.join)
-            dfx['type'] = dft['type'].agg(','.join)
-            # Ensures independently parsed cliques overwrite the cliques, which inherited neighbor weights
-            xdf = pd.concat([dfx, cliquedf]).drop_duplicates(subset = ['entry1', 'entry2'], keep = 'last')
-
-            if xdf[(xdf['entry1'].str.startswith('cpd:')) | (xdf['entry2'].str.startswith('cpd:'))].empty == True and xdf[(xdf['entry1'].str.startswith('undefined')) | (xdf['entry2'].str.startswith('undefined'))].empty == True:
-                # If pathway has no compounds or undefined nodes, write file
-                xdf_out = xdf[(~xdf['entry1'].str.startswith('path')) & (~xdf['entry2'].str.startswith('path'))]
-                # Removes unneccessary extra "OR" edges connecting to each other from the final dataframe
-                # Comment out and remove the 1 from the rest of the dataframes if you want to see their
-                # interaction in the final dataframe, but these are not meant to interact
-                xdf_out1 = xdf_out[xdf_out.name != 'clique']
-                if names:
-                    names_dictionary = names_dict(root, root.get('org'), conversion_dictionary)
-                    xdf_out1['entry1_name'] = xdf_out1.entry1.map(names_dictionary)
-                    xdf_out1['entry2_name'] = xdf_out1.entry2.map(names_dictionary)
-                    # Cleans up the dataframe for the entry name to be closer
-                    # to the entry accession code
-                    xdf_out1.insert(1, 'entry1_name', xdf_out1.pop('entry1_name'))
-                    xdf_out1.insert(3, 'entry2_name', xdf_out1.pop('entry2_name'))
-                    xdf_out1.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
-                else:
-                    xdf_out1.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
-            else:
-                # These next series of steps are for propagating compounds and undefined nodes
-                # Uses networkx
-                G = nx.from_pandas_edgelist(xdf, source = 'entry1', target = 'entry2', edge_attr = 'name', create_using = nx.DiGraph())
-                new_edges = []
-                for node in G.nodes:
-                    # Gather roots and leaflets
-                    roots = [n for n, d in G.in_degree() if d == 0]
-                    leaflets = [n for n, d in G.out_degree() if d == 0]
-                    # Find compounds or undefined proteins that might need propagation
-                    if node.startswith('cpd') or node.startswith('undefined'):
-                        if node in roots or node in leaflets:
-                            # Passes root nodes and leaflet nodes
-                            # These do not need propagation as they terminate
-                            pass
-                        else:
-                            out_edges = [e for e in G.out_edges(node)]
-                            in_edges = [e for e in G.in_edges(node)]
-                            for i in in_edges:
-                                for o in out_edges:
-                                    if not i[0].startswith('cpd') and not o[1].startswith('cpd') and not i[0].startswith('undefined') and not o[1].startswith('undefined') and not i[0].startswith('path') and not o[1].startswith('path'):
-                                        # Simple compound propagation removes compound between two genes
-                                        # Example: hsa:xxx -> cpd:xxx -> hsa:xxx to hsa:xxx -> hsa:xxx
-                                        new_edges.append([i[0], o[1], 'CPp', 'Custom', 'compound propagation'])
-                                    else:
-                                        # Loops through roots and leaves to find the start and end of each node that is propagated
-                                        # These pathways have copious amounts of compounds and undefined genes in between the propagated genes
-                                        # This loop also picks up on non-proteins that are left out if the above simple compound propagation is used
-                                        for root in roots:
-                                            for leaf in leaflets:
-                                                if nx.has_path(G, root, node) == True and nx.has_path(G, node, leaf) == True:
-                                                    # Uses the shortest path between the root/leaf and query node
-                                                    rpath = [p for p in nx.shortest_path(G, root, node)]
-                                                    lpath = [p for p in nx.shortest_path(G, node, leaf)]
-                                                    # Skip paths that have no proteins
-                                                    if all(node.startswith('cpd') or node.startswith('undefined') or node.startswith('path') for node in rpath) == True or all(node.startswith('cpd') or node.startswith('undefined') or node.startswith('path') for node in lpath) == True:
-                                                        pass
-                                                    else:
-                                                        # Indexes all elements in the shortest path list that is a gene
-                                                        rindex = [index for index, element in enumerate(rpath) if not element.startswith('cpd') and not element.startswith('undefined') and not element.startswith('path')]
-                                                        lindex = [index for index, element in enumerate(lpath) if not element.startswith('cpd') and not element.startswith('undefined') and not element.startswith('path')]
-                                                        # Here we use the maximum of the root path and the minimum of the leaf path to successfully propagate compounds
-                                                        # Note below example
-                                                        # [mmu:x, cpd:###, cpd:x] --> max is mmu:x
-                                                        # [cpd:x, cpd:###, undefined, mmu:y, mmu:###] --> min is mmu:y
-                                                        # creates edge [mmu:x, mmu:y]
-                                                        new_edges.append([rpath[max(rindex)], lpath[min(lindex)], 'CPp', 'Custom', 'compound propagation'])
-                # Creates a dataframe of the new edges that are a result of compound propagation
-                new_edges_df = pd.DataFrame(new_edges, columns = ['entry1', 'entry2', 'type', 'value', 'name'])
-                # Concatenates the new edges with the edges from the above (cliques and original parsed edges)
-                df0 = pd.concat([xdf, new_edges_df])
-                # Drop any duplicated edges
-                df1 = df0.drop_duplicates()
-                # Removes compounds and undefined as they were propagated and no longer needed
-                df2 = df1[(~df1['entry1'].str.startswith('cpd')) & (~df1['entry2'].str.startswith('cpd')) & (~df1['entry1'].str.startswith('undefined')) & (~df1['entry2'].str.startswith('undefined')) & (~df1['entry1'].str.startswith('path')) & (~df1['entry2'].str.startswith('path'))]
-                # Removes unneccessary extra "OR" edges connecting to each other from the final dataframe
-                # Comment out and remove the 1 from the rest of the dataframes if you want to see their
-                # interaction in the final dataframe, but these are not meant to interact
-                df3 = df2[df2.name != 'clique']
-                # Add if loop since the names dictionary takes forever due to the api call
-                if names:
-                    names_dictionary = names_dict(root, root.get('org'), conversion_dictionary)
-                    df3['entry1_name'] = df3.entry1.map(names_dictionary)
-                    df3['entry2_name'] = df3.entry2.map(names_dictionary)
-                    # Cleans up the dataframe for the entry name to be closer
-                    # to the entry accession code
-                    df3.insert(1, 'entry1_name', df3.pop('entry1_name'))
-                    df3.insert(3, 'entry2_name', df3.pop('entry2_name'))
-                    df3.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
-                else:
-                    df3.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
-    else:
-        typer.echo(f'Now parsing: {title}...')
-
-        e1 = []
-        e2 = []
-        n = []
-        v = []
-        for relation in root.findall('relation'):
-            e1.append(relation.get('entry1'))
-            e2.append(relation.get('entry2'))
-            for subtype in relation.findall('subtype'):
-                n.append(subtype.get('name'))
-                v.append(subtype.get('value'))
-
-        # iterates through the xml file to obtain the edges
-        # edge is defined by relation element and its subtype element
-        d = []
-        for relation in root.findall('relation'):
-            for subtype in relation:
-                d1=relation.attrib
-                d2=subtype.attrib
-                d3=json.dumps(d1),json.dumps(d2)
-                d.append(d3)
-
-        # parse edge information into compressed expression, ex. entry1\entry2\type\name\value
-        edgelist=[]
-        # Takes json dictionary and removes formatting in order to obtain an edgelist
-        # This odd line of code is necessary  because of the various nested and non-nested subtypes
-        # This allows for edges to inherit weights from a nested subtype
-        for line in d:
-            x=line[0].replace("{","").replace("}","").replace('"entry1":',"") \
-                .replace('"entry2":',"").replace('"type":',"").replace('"name":',"") \
-                .replace('"value":',"").replace('"','').replace(',',"\t").replace(' ', '')
-            y=line[1].replace("{","").replace("}","").replace('"name":',"") \
-                .replace('"',"").replace('value:',"").replace(",",'\t').replace(' ', '')
-            edgelist.append(x+"\t"+y)
-
-        df=pd.DataFrame(edgelist)
-
-        if df.empty:
-            typer.echo(f'File "{input_data}" cannot be parsed.\nVisit {pathway_link} for pathway details.\nThere are likely no edges in which to parse...')
+        if has_compounds_or_undefined and not self.compound:
+            xdf = self._propagate_compounds(xdf)
+            xdf = xdf[xdf.name != 'clique']
+            if self.names:
+                xdf['entry1_name'] = xdf.entry1.map(self.names_dictionary)
+            xdf.to_csv(self.wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
         else:
-            df=df[0].str.split("\t", expand=True).rename({0: 'entry1',1: 'entry2',
-                                                          2: 'types', 3:'name',
-                                                          4: 'value'}, axis='columns')
+            xdf = xdf[xdf.name != 'clique']
+            if self.names:
+                xdf = self._add_names(xdf)
+            xdf.to_csv(self.wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
 
-            entry_dict = defaultdict(list)
-            for entries in root.findall('entry'):
-                for key, items in entries.attrib.items():
-                    entry_dict[key].append(items)
 
-            entry_id=[]
-            entry_name=[]
-            entry_type=[]
-            for key, items in entry_dict.items():
-                if key == 'id':
-                    for i in items:
-                        entry_id.append(i)
-                if key == 'name':
-                    for i in items:
-                        entry_name.append(i)
-                if key == 'type':
-                    for i in items:
-                        entry_type.append(i)
+    def _parse_graphics(df, graphics, df_out, wd, pathway):
+        # Graphics
+        pos_dict1 = {}
+        pos_dict2 = {}
+        for index, rows in df_out.iterrows():
+            pos_dict1[rows['entry1']] = rows['pos1']
+            pos_dict2[rows['entry2']] = rows['pos2']
+        pos = pos_dict1 | pos_dict2
+        json_dict = json.dumps(pos)
+        with open(wd / '{}_graphics.txt'.format(pathway), 'w') as outfile:
+            outfile.write(json_dict)
 
-            if unique:
-                conversion_dictionary = conv_dict_unique(root)
-            else:
-                conversion_dictionary = conv_dict(root)
 
-            # Convert entry1 and entry2 id to kegg id
-            df['entry1'] = df['entry1'].map(conversion_dictionary)
-            df['entry2'] = df['entry2'].map(conversion_dictionary)
-            df['entry1'] = df['entry1'].astype(str).str.split(' ', expand = False)
-            df['entry2'] = df['entry2'].astype(str).str.split(' ', expand = False)
 
-            # Parse the cliques seperate so they won't inherit neighbor weights
-            # Allows for custom weights so user knows which are customly parsed
-            clique_edges = []
-            for index, rows in df.iterrows():
-                if len(rows['entry1']) > 1:
-                    cliques = [x for x in combinations(rows['entry1'], 2)]
-                    cliques1 = [tup + ('type 2', 'undirectional', 'clique') for tup in cliques]
-                    clique_edges.append(cliques1)
-                if len(rows['entry2']) > 1:
-                    cliques = [x for x in combinations(rows['entry2'], 2)]
-                    cliques2 = [tup + ('type 2', 'undirectional', 'clique') for tup in cliques]
-                    clique_edges.append(cliques2)
-            clique2df = [e for edge in clique_edges for e in edge]
-            cliquedf = pd.DataFrame.from_records(clique2df, columns = ['entry1', 'entry2', 'type', 'value', 'name'])
 
-            edges = []
-            for index, rows in df.iterrows():
-                lists = rows['entry1'] + rows['entry2']
-                # Cliques here inherit neighbor weights, but will be overwritten by above
-                cliques = [x for x in combinations(lists, 2)]
-                network = [tup + (rows['types'], rows['value'], rows['name']) for tup in cliques]
-                edges.append(network)
 
-            # This removes edges which contain +p (phosphorylation) these oftentimes
-            # overwrite important weight attributes while providing no vital information
-            # edges2df = [e for edge in edges for e in edge if '+p' not in e and '-p' not in e]
-
-            # Standard line for obtaining a dataframe of edges
-            edges2df = [e for edge in edges for e in edge]
-            # Create pandas DF from edges
-            df_out = pd.DataFrame.from_records(edges2df, columns = ['entry1', 'entry2', 'type', 'value', 'name'])
-
-            dft = df_out.groupby(['entry1', 'entry2'])['type'].apply(list).reset_index()
-            dfv = df_out.groupby(['entry1', 'entry2'])['value'].apply(list).reset_index()
-            dfn = df_out.groupby(['entry1', 'entry2'])['name'].apply(list).reset_index()
-            dfx = dft
-            dfx['value'] = dfv['value'].agg(','.join)
-            dfx['name'] = dfn['name'].agg(','.join)
-            dfx['type'] = dft['type'].agg(','.join)
-            # Ensures independently parsed cliques overwrite the cliques, which inherited neighbor weights
-            xdf = pd.concat([dfx, cliquedf]).drop_duplicates(subset = ['entry1', 'entry2'], keep = 'last')
-
-            # if decide to keep compounds and undefined nodes
-            if compound:
-                xdf_out = xdf
-                xdf_out1 = xdf_out[xdf_out.name != 'clique']
-                if names:
-                    names_dictionary = names_dict(root, root.get('org'), conversion_dictionary)
-                    xdf_out1['entry1_name'] = xdf_out1.entry1.map(names_dictionary)
-                    xdf_out1['entry2_name'] = xdf_out1.entry2.map(names_dictionary)
-                    # Cleans up the dataframe for the entry name to be closer
-                    # to the entry accession code
-                    xdf_out1.insert(1, 'entry1_name', xdf_out1.pop('entry1_name'))
-                    xdf_out1.insert(3, 'entry2_name', xdf_out1.pop('entry2_name'))
-                    xdf_out1.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
-                else:
-                    xdf_out1.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
-
-            else:
-                if xdf[(xdf['entry1'].str.startswith('cpd:')) | (xdf['entry2'].str.startswith('cpd:'))].empty == True and xdf[(xdf['entry1'].str.startswith('undefined')) | (xdf['entry2'].str.startswith('undefined'))].empty == True:
-                    # If pathway has no compounds or undefined nodes, write file
-                    xdf_out = xdf[(~xdf['entry1'].str.startswith('path')) & (~xdf['entry2'].str.startswith('path'))]
-                    # Removes unneccessary extra "OR" edges connecting to each other from the final dataframe
-                    # Comment out and remove the 1 from the rest of the dataframes if you want to see their
-                    # interaction in the final dataframe, but these are not meant to interact
-                    xdf_out1 = xdf_out[xdf_out.name != 'clique']
-                    if names:
-                        names_dictionary = names_dict(root, root.get('org'), conversion_dictionary)
-                        xdf_out1['entry1_name'] = xdf_out1.entry1.map(names_dictionary)
-                        xdf_out1['entry2_name'] = xdf_out1.entry2.map(names_dictionary)
-                        # Cleans up the dataframe for the entry name to be closer
-                        # to the entry accession code
-                        xdf_out1.insert(1, 'entry1_name', xdf_out1.pop('entry1_name'))
-                        xdf_out1.insert(3, 'entry2_name', xdf_out1.pop('entry2_name'))
-                        xdf_out1.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
-                    else:
-                        xdf_out1.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
-                else:
-                    # These next series of steps are for propagating compounds and undefined nodes
-                    # Uses networkx
-                    G = nx.from_pandas_edgelist(xdf, source = 'entry1', target = 'entry2', edge_attr = 'name', create_using = nx.DiGraph())
-                    new_edges = []
-                    for node in G.nodes:
-                        # Gather roots and leaflets
-                        roots = [n for n, d in G.in_degree() if d == 0]
-                        leaflets = [n for n, d in G.out_degree() if d == 0]
-                        # Find compounds or undefined proteins that might need propagation
-                        if node.startswith('cpd') or node.startswith('undefined'):
-                            if node in roots or node in leaflets:
-                                # Passes root nodes and leaflet nodes
-                                # These do not need propagation as they terminate
-                                pass
-                            else:
-                                out_edges = [e for e in G.out_edges(node)]
-                                in_edges = [e for e in G.in_edges(node)]
-                                for i in in_edges:
-                                    for o in out_edges:
-                                        if not i[0].startswith('cpd') and not o[1].startswith('cpd') and not i[0].startswith('undefined') and not o[1].startswith('undefined') and not i[0].startswith('path') and not o[1].startswith('path'):
-                                            # Simple compound propagation removes compound between two genes
-                                            # Example: hsa:xxx -> cpd:xxx -> hsa:xxx to hsa:xxx -> hsa:xxx
-                                            new_edges.append([i[0], o[1], 'CPp', 'Custom', 'compound propagation'])
-                                        else:
-                                            # Loops through roots and leaves to find the start and end of each node that is propagated
-                                            # These pathways have copious amounts of compounds and undefined genes in between the propagated genes
-                                            # This loop also picks up on non-proteins that are left out if the above simple compound propagation is used
-                                            for root in roots:
-                                                for leaf in leaflets:
-                                                    if nx.has_path(G, root, node) == True and nx.has_path(G, node, leaf) == True:
-                                                        # Uses the shortest path between the root/leaf and query node
-                                                        rpath = [p for p in nx.shortest_path(G, root, node)]
-                                                        lpath = [p for p in nx.shortest_path(G, node, leaf)]
-                                                        # Skip paths that have no proteins
-                                                        if all(node.startswith('cpd') or node.startswith('undefined') or node.startswith('path') for node in rpath) == True or all(node.startswith('cpd') or node.startswith('undefined') or node.startswith('path') for node in lpath) == True:
-                                                            pass
-                                                        else:
-                                                            # Indexes all elements in the shortest path list that is a gene
-                                                            rindex = [index for index, element in enumerate(rpath) if not element.startswith('cpd') and not element.startswith('undefined') and not element.startswith('path')]
-                                                            lindex = [index for index, element in enumerate(lpath) if not element.startswith('cpd') and not element.startswith('undefined') and not element.startswith('path')]
-                                                            # Here we use the maximum of the root path and the minimum of the leaf path to successfully propagate compounds
-                                                            # Note below example
-                                                            # [mmu:x, cpd:###, cpd:x] --> max is mmu:x
-                                                            # [cpd:x, cpd:###, undefined, mmu:y, mmu:###] --> min is mmu:y
-                                                            # creates edge [mmu:x, mmu:y]
-                                                            new_edges.append([rpath[max(rindex)], lpath[min(lindex)], 'CPp', 'Custom', 'compound propagation'])
-                    # Creates a dataframe of the new edges that are a result of compound propagation
-                    new_edges_df = pd.DataFrame(new_edges, columns = df_out.columns)
-                    # Concatenates the new edges with the edges from the above (cliques and original parsed edges)
-                    df0 = pd.concat([xdf, new_edges_df])
-                    # Drop any duplicated edges
-                    df1 = df0.drop_duplicates()
-                    # Removes compounds and undefined as they were propagated and no longer needed
-                    df2 = df1[(~df1['entry1'].str.startswith('cpd')) & (~df1['entry2'].str.startswith('cpd')) & (~df1['entry1'].str.startswith('undefined')) & (~df1['entry2'].str.startswith('undefined')) & (~df1['entry1'].str.startswith('path')) & (~df1['entry2'].str.startswith('path'))]
-                    # Removes unneccessary extra "OR" edges connecting to each other from the final dataframe
-                    # Comment out and remove the 1 from the rest of the dataframes if you want to see their
-                    # interaction in the final dataframe, but these are not meant to interact
-                    df3 = df2[df2.name != 'clique']
-                    # Add if loop since the names dictionary takes forever due to the api call
-                    if names:
-                        names_dictionary = names_dict(root, root.get('org'), conversion_dictionary)
-                        df3['entry1_name'] = df3.entry1.map(names_dictionary)
-                        df3['entry2_name'] = df3.entry2.map(names_dictionary)
-                        # Cleans up the dataframe for the entry name to be closer
-                        # to the entry accession code
-                        df3.insert(1, 'entry1_name', df3.pop('entry1_name'))
-                        df3.insert(3, 'entry2_name', df3.pop('entry2_name'))
-                        df3.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
-                    else:
-                        df3.to_csv(wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
-
-def genes_folder(input_data: str, wd: Path, compound:bool = False, unique: bool = False, graphics: bool = False, names: bool = False):
-    for file in Path(input_data).glob('*.xml'):
-        genes_file(file, wd, compound=compound, unique=unique,
-                   graphics=graphics, names=names)
+def genes_parser(input_data: str, wd: Path, compound:bool = False, unique: bool = False, graphics: bool = False, names: bool = False):
+    '''
+    Converts a folder of KGML files or a single KGML file into a weighted
+    edgelist of genes that can be used in graph analysis.
+    '''
+    if Path(input_data).is_dir():
+        for file in Path(input_data).glob('*.xml'):
+            gip = GenesInteractionParser(input_data, wd, compound=compound,
+                                         unique=unique, graphics=graphics, names=names)
+            gip.genes_file()
+    else:
+        gip = GenesInteractionParser(input_data, wd, compound=compound,
+                                     unique=unique, graphics=graphics, names=names)
+        gip.genes_file()

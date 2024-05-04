@@ -14,8 +14,7 @@ from pathlib import Path
 from .knext.convert import convert_file
 from .knext.convert import convert_folder
 from .knext.call import kgml
-from .knext.genes import genes_file
-from .knext.genes import genes_folder
+from .knext.genes import genes_parser
 from .knext.mixed import mixed_file
 from .knext.mixed import mixed_folder
 
@@ -80,10 +79,8 @@ def genes(input_data: str, results: str, compound:bool, unique: bool, graphics: 
         else:
             wd = Path(results)
 
-    # Check if the input is a file or folder
-    file_func = genes_file if Path(input_data).is_file() else genes_folder
-    # Call the appropriate function
-    file_func(input_data, wd, compound=compound, unique=unique, graphics=graphics, names=names)
+    genes_parser(input_data, wd, compound, unique, graphics, names)
+
 
 @cli.command()
 @click.argument('input_data')

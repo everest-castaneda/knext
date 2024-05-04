@@ -171,6 +171,8 @@ class GenesInteractionParser:
         df=df[0].str.split("\t", expand=True).rename({0: 'entry1',1: 'entry2',
                                                       2: 'types', 3:'name',
                                                       4: 'value'}, axis='columns')
+        # convert value to kegg id
+        df['value'] = df['value'].map(self.conversion_dictionary)
         # Convert entry1 and entry2 id to kegg id
         df['entry1'] = df['entry1'].map(self.conversion_dictionary)
         df['entry2'] = df['entry2'].map(self.conversion_dictionary)
@@ -255,7 +257,11 @@ class GenesInteractionParser:
                     in_edges = [e for e in G.in_edges(node)]
                     for i in in_edges:
                         for o in out_edges:
-                            if not i[0].startswith('cpd') and not o[1].startswith('cpd') and not i[0].startswith('undefined') and not o[1].startswith('undefined') and not i[0].startswith('path') and not o[1].startswith('path'):
+                            #todo: need to fix this
+                            if (not i[0].startswith('cpd') and not o[1].startswith('cpd') and
+                                    not i[0].startswith('undefined') and
+                                    not o[1].startswith('undefined') and
+                                    not i[0].startswith('path') and not o[1].startswith('path')):
                                 # Simple compound propagation removes compound between two genes
                                 # Example: hsa:xxx -> cpd:xxx -> hsa:xxx to hsa:xxx -> hsa:xxx
                                 new_edges.append([i[0], o[1], 'CPp', 'Custom', 'compound propagation'])

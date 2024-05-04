@@ -15,8 +15,6 @@ from .knext.convert import convert_file
 from .knext.convert import convert_folder
 from .knext.call import kgml
 from .knext.genes import genes_parser
-from .knext.mixed import mixed_file
-from .knext.mixed import mixed_folder
 
 @click.group()
 def cli():

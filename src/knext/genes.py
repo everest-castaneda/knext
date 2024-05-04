@@ -72,8 +72,14 @@ class GenesInteractionParser:
         df=df[0].str.split("\t", expand=True).rename({0: 'entry1',1: 'entry2',
                                                       2: 'types', 3:'name',
                                                       4: 'value'}, axis='columns')
-        # convert value to kegg id
-        # df['value'] = df['value'].map(self.conversion_dictionary)
+        # convert compound value to kegg id if only relation.type is "compound"
+        def apply_conversion(row):
+            if row['name'] == 'compound':
+                return self.conversion_dictionary.get(row['value'], row['value'])
+            else:
+                return row['value']
+        df['value'] = df.apply(apply_conversion, axis=1)
+
         # Convert entry1 and entry2 id to kegg id
         df['entry1'] = df['entry1'].map(self.conversion_dictionary)
         df['entry2'] = df['entry2'].map(self.conversion_dictionary)
@@ -158,7 +164,6 @@ class GenesInteractionParser:
                     in_edges = [e for e in G.in_edges(node)]
                     for i in in_edges:
                         for o in out_edges:
-                            #todo: need to fix this
                             if (not i[0].startswith('cpd') and not o[1].startswith('cpd') and
                                     not i[0].startswith('undefined') and
                                     not o[1].startswith('undefined') and

@@ -48,115 +48,42 @@ def get_kgml(species, results):
         typer.echo(f'No output directory provided. All files will be saved to:\n{results}')
         results.mkdir(exist_ok = True)
         kgml(species, results)
-        
+
 @cli.command()
 @click.argument('input_data')
 @click.option('-r', '--results', required = False)
+@click.option('-c', '--compound', default = False, is_flag = True)
 @click.option('-u', '--unique', default = False, is_flag = True)
 @click.option('-g', '--graphics', default = False, is_flag = True)
 @click.option('-n', '--names', default = False, is_flag = True)
-def genes(input_data: str, results: str, unique: bool, graphics: bool, names: bool):
+def genes(input_data: str, results: str, compound:bool, unique: bool, graphics: bool, names: bool):
     """
     Converts a folder of KGML files or a single KGML file into a weighted
-    edgelist of genes that can be used in graph analysis. If -u/--unique flag 
-    is used genes are returned with terminal modifiers to enhance network 
-    visualization or analysis. If the -g/--graphics flag is used, x-y 
-    coordinates of pathways are returned, which may be used as positions in 
+    edgelist of genes that can be used in graph analysis. If -u/--unique flag
+    is used genes are returned with terminal modifiers to enhance network
+    visualization or analysis. If the -g/--graphics flag is used, x-y
+    coordinates of pathways are returned, which may be used as positions in
     NetworkX\'s graph drawing commands.
     """
-    if Path.exists(Path(input_data)) == False:
+    if not Path(input_data).exists():
         typer.echo('Please input a directory of KGML files or an individual KGML file...')
         sys.exit()
+
+    # Check if the results is provided
+    if not results:
+        wd = Path.cwd()
+        typer.echo(f'\nNo output directory given. All resulting files or folders will be saved to current directory:\n{wd}\n')
     else:
-        if results:
-            if Path.exists(Path(results)) == False:
-                typer.echo('Directory not found.\nPlease input a directory in which to save the results...')
-            else:
-                wd = Path(results)
-                if graphics and unique and names:
-                    if Path(input_data).is_file():
-                        genes_file(input_data, wd, unique = True, graphics = True, names = True)
-                    else:
-                        genes_folder(input_data, wd, unique = True, graphics = True, names = True)
-                elif graphics and unique and not names:
-                    if Path(input_data).is_file():
-                        genes_file(input_data, wd, unique = True, graphics = True)
-                    else:
-                        genes_folder(input_data, wd, unique = True, graphics = True)
-                elif graphics and names and not unique:
-                    if Path(input_data).is_file():
-                        genes_file(input_data, wd, graphics = True, names = True)
-                    else:
-                        genes_folder(input_data, wd, graphics = True, names = True)
-                elif graphics and not unique and not names:
-                    if Path(input_data).is_file():
-                        genes_file(input_data, wd, graphics = True)
-                    else:
-                        genes_folder(input_data, wd, graphics = True)
-                elif unique and names and not graphics:
-                    if Path(input_data).is_file():
-                        genes_file(input_data, wd, unique = True, names = True)
-                    else:
-                        genes_folder(input_data, wd, unique = True, names = True)
-                elif unique and not names and not graphics:
-                    if Path(input_data).is_file():
-                        genes_file(input_data, wd, unique = True)
-                    else:
-                        genes_folder(input_data, wd, unique = True)
-                elif names and not unique and not graphics:
-                    if Path(input_data).is_file():
-                        genes_file(input_data, wd, names = True)
-                    else:
-                        genes_folder(input_data, wd, names = True)
-                else:
-                    if Path(input_data).is_file():
-                        genes_file(input_data, wd)
-                    else:
-                        genes_folder(input_data, wd)
-                    
-        else:
+        if not Path(results).exists():
             wd = Path.cwd()
-            typer.echo(f'\nNo output directory given. All resulting files or folders will be saved to current directory:\n{wd}\n')
-            if graphics and unique and names:
-                if Path(input_data).is_file():
-                    genes_file(input_data, wd, unique = True, graphics = True, names = True)
-                else:
-                    genes_folder(input_data, wd, unique = True, graphics = True, names = True)
-            elif graphics and unique and not names:
-                if Path(input_data).is_file():
-                    genes_file(input_data, wd, graphics = True, unique = True)
-                else:
-                    genes_folder(input_data, wd, graphics = True, unique = True)
-            elif graphics and names and not unique:
-                if Path(input_data).is_file():
-                    genes_file(input_data, wd, graphics = True, names = True)
-                else:
-                    genes_folder(input_data, wd, graphics = True, names = True)
-            elif graphics and not unique and not names:
-                if Path(input_data).is_file():
-                    genes_file(input_data, wd, graphics = True)
-                else:
-                    genes_folder(input_data, wd, graphics = True)
-            elif unique and names and not graphics:
-                if Path(input_data).is_file():
-                    genes_file(input_data, wd, unique = True, names = True)
-                else:
-                    genes_folder(input_data, wd, unique = True, names = True)
-            elif unique and not names and not graphics:
-                if Path(input_data).is_file():
-                    genes_file(input_data, wd, unique = True)
-                else:
-                    genes_folder(input_data, wd, unique = True)
-            elif names and not unique and not graphics:
-                if Path(input_data).is_file():
-                    genes_file(input_data, wd, names = True)
-                else:
-                    genes_folder(input_data, wd, names = True)
-            else:
-                if Path(input_data).is_file():
-                    genes_file(input_data, wd)
-                else:
-                    genes_folder(input_data, wd)
+            typer.echo('Directory not found. All resulting files or folders will be saved to current directory:\n{wd}\n')
+        else:
+            wd = Path(results)
+
+    # Check if the input is a file or folder
+    file_func = genes_file if Path(input_data).is_file() else genes_folder
+    # Call the appropriate function
+    file_func(input_data, wd, compound=compound, unique=unique, graphics=graphics, names=names)
 
 @cli.command()
 @click.argument('input_data')
@@ -265,7 +192,7 @@ def mixed(input_data: str, results: str, unique: bool = False, graphics: bool = 
                     mixed_file(input_data, wd)
                 else:
                     mixed_folder(input_data, wd)
-        
+
 @cli.command()
 @click.argument('species')
 @click.argument('input_data')
@@ -328,7 +255,7 @@ def convert(input_data, species, graphics, results: bool = False, uniprot: bool 
                 if Path(input_data).is_file():
                     convert_file(species, input_data, wd)
                 else:
-                    convert_folder(species, input_data, wd)       
+                    convert_folder(species, input_data, wd)
         else:
             wd = Path.cwd()
             typer.echo(f'\nNo output directory given. All resulting files or folders will be saved to current directory:\n{wd}\n')

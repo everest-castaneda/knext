@@ -285,12 +285,11 @@ class GenesInteractionParser:
                 xdf = xdf[xdf.name != 'clique']
                 if self.names:
                     xdf['entry1_name'] = xdf.entry1.map(self.names_dictionary)
-                xdf.to_csv(self.wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
         else:
             xdf = xdf[xdf.name != 'clique']
             if self.names:
                 xdf = self._add_names(xdf)
-            xdf.to_csv(self.wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
+        xdf.to_csv(self.wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
 
 
     def _parse_graphics(df, graphics, df_out, wd, pathway):

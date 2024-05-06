@@ -46,7 +46,7 @@ def get_kgml(species, results):
         results.mkdir(exist_ok = True)
         kgml(species, results)
 
-def parse(input_data: str, results: str, mixed:bool, unique: bool, graphics: bool, names: bool):
+def parse(input_data: str, results: str, mixed:bool, unique: bool, graphics: bool, names: bool, verbose: bool = False):
     """
     Converts a folder of KGML files or a single KGML file into a weighted
     edgelist of genes that can be used in graph analysis. If -u/--unique flag
@@ -55,6 +55,9 @@ def parse(input_data: str, results: str, mixed:bool, unique: bool, graphics: boo
     coordinates of pathways are returned, which may be used as positions in
     NetworkX\'s graph drawing commands.
     """
+    if verbose:
+        typer.echo(typer.style("Verbose mode enabled", fg=typer.colors.GREEN))
+
     if not Path(input_data).exists():
         typer.echo('Please input a directory of KGML files or an individual KGML file...')
         sys.exit()
@@ -70,7 +73,8 @@ def parse(input_data: str, results: str, mixed:bool, unique: bool, graphics: boo
         else:
             wd = Path(results)
 
-    genes_parser(input_data, wd, mixed=mixed, unique=unique, graphics=graphics, names=names)
+    genes_parser(input_data, wd, mixed=mixed, unique=unique, graphics=graphics,
+                 names=names, verbose=verbose)
 
 @cli.command()
 @click.argument('input_data')
@@ -78,6 +82,7 @@ def parse(input_data: str, results: str, mixed:bool, unique: bool, graphics: boo
 @click.option('-u', '--unique', default = False, is_flag = True)
 @click.option('-g', '--graphics', default = False, is_flag = True)
 @click.option('-n', '--names', default = False, is_flag = True)
+@click.option('-v', '--verbose', default = False, is_flag = True)
 def genes(input_data: str, results: str, unique: bool, graphics: bool, names: bool):
     """
     Converts a folder of KGML files or a single KGML file into a weighted
@@ -89,7 +94,7 @@ def genes(input_data: str, results: str, unique: bool, graphics: bool, names: bo
     """
     # work as a wrapper function with mixed=False call parse function parse the file(s)
     parse(input_data, results=results, mixed=False,
-          unique=unique, graphics=graphics, names=names)
+          unique=unique, graphics=graphics, names=names, verbose=False)
 
 
 @cli.command()
@@ -98,7 +103,9 @@ def genes(input_data: str, results: str, unique: bool, graphics: bool, names: bo
 @click.option('-u', '--unique', default = False, is_flag = True)
 @click.option('-g', '--graphics', default = False, is_flag = True)
 @click.option('-n', '--names', default = False, is_flag = True)
-def mixed(input_data: str, results: str, unique: bool = False, graphics: bool = False, names: bool = False):
+@click.option('-v', '--verbose', default = False, is_flag = True)
+def mixed(input_data: str, results: str, unique: bool = False, graphics: bool = False,
+          names: bool = False, verbose: bool = False):
     """
     Converts a folder of KGML files or a single KGML file into a weighted
     edgelist of mixed genes, compounds, and pathways that can be used in graph 
@@ -108,7 +115,8 @@ def mixed(input_data: str, results: str, unique: bool = False, graphics: bool = 
     which may be used as positions in NetworkX\'s graph drawing commands.
     """
     # work as a wrapper function with mixed=True call parse function parse the file(s)
-    parse(input_data, results=results, mixed = True, unique = unique, graphics = graphics, names = names)
+    parse(input_data, results=results, mixed = True, unique = unique,
+          graphics = graphics, names = names, verbose = verbose)
 
 @cli.command()
 @click.argument('species')

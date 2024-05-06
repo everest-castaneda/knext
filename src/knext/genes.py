@@ -21,17 +21,21 @@ from knext import utils
 
 
 class FileNotFound(Exception):
-    pass
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
 
 class GenesInteractionParser:
 
-    def __init__(self, input_data: str, wd: Path, mixed:bool = False, unique: bool = False, graphics: bool = False, names: bool = False):
+    def __init__(self, input_data: str, wd: Path, mixed:bool = False, unique: bool = False,
+                 graphics: bool = False, names: bool = False, verbose: bool = False):
         self.input_data = input_data
         self.wd = wd
         self.mixed = mixed
         self.unique = unique
         self.graphics = graphics
         self.names = names
+        self.verbose = verbose
 
         tree = ET.parse(input_data)
         self.root = tree.getroot()
@@ -67,7 +71,7 @@ class GenesInteractionParser:
         df=pd.DataFrame(edgelist)
         if df.empty:
             # throw error if no edges are found
-            raise FileNotFound(f'File "{self.input_data}" cannot be parsed.\nVisit {pathway_link} for pathway details.\nThere are likely no edges in which to parse...')
+            raise FileNotFound(f'ERROR: File "{self.input_data}" cannot be parsed.\nVisit {pathway_link} for pathway details.\nThere are likely no edges in which to parse...')
 
         df=df[0].str.split("\t", expand=True).rename({0: 'entry1',1: 'entry2',
                                                       2: 'types', 3:'name',
@@ -221,9 +225,9 @@ class GenesInteractionParser:
         dfv = df_out.groupby(['entry1', 'entry2'])['value'].apply(list).reset_index()
         dfn = df_out.groupby(['entry1', 'entry2'])['name'].apply(list).reset_index()
         dfx = dft
-        dfx['type'] = dft['type'].agg(','.join)
-        dfx['value'] = dfv['value'].agg(','.join)
-        dfx['name'] = dfn['name'].agg(','.join)
+        dfx['type'] = dft['type'].transform(','.join)
+        dfx['value'] = dfv['value'].transform(','.join)
+        dfx['name'] = dfn['name'].transform(','.join)
         # Ensures independently parsed cliques overwrite the cliques, which inherited neighbor weights
         xdf = pd.concat([dfx, cliquedf]).drop_duplicates(subset = ['entry1', 'entry2'], keep = 'last')
         return  xdf
@@ -254,7 +258,8 @@ class GenesInteractionParser:
         pathway_link = self.root.get('link')
 
         # Common operations
-        typer.echo(f'Now parsing: {title}...')
+        if self.verbose:
+            typer.echo(typer.style(f'Now parsing: {title}...', fg=typer.colors.GREEN, bold=False))
         df = self._get_edges()
 
         if self.graphics:
@@ -308,7 +313,8 @@ class GenesInteractionParser:
 
 
 
-def genes_parser(input_data: str, wd: Path, mixed:bool = False, unique: bool = False, graphics: bool = False, names: bool = False):
+def genes_parser(input_data: str, wd: Path, mixed:bool = False, unique: bool = False,
+                 graphics: bool = False, names: bool = False, verbose: bool = False):
     '''
     Converts a folder of KGML files or a single KGML file into a weighted
     edgelist of genes that can be used in graph analysis.
@@ -317,12 +323,14 @@ def genes_parser(input_data: str, wd: Path, mixed:bool = False, unique: bool = F
         for file in Path(input_data).glob('*.xml'):
             try:
                 gip = GenesInteractionParser(file, wd, mixed=mixed,
-                                             unique=unique, graphics=graphics, names=names)
+                                             unique=unique, graphics=graphics, names=names,
+                                             verbose=verbose)
                 gip.genes_file()
             except FileNotFound as e:
-                typer.echo(e)
+                typer.echo(typer.style(e.message, fg=typer.colors.RED, bold=True))
                 continue
     else:
         gip = GenesInteractionParser(input_data, wd, mixed=mixed,
-                                     unique=unique, graphics=graphics, names=names)
+                                     unique=unique, graphics=graphics, names=names,
+                                     verbose=verbose)
         gip.genes_file()

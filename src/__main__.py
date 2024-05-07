@@ -82,7 +82,7 @@ def parse(input_data: str, results: str, mixed:bool, unique: bool, graphics: boo
 @click.option('-g', '--graphics', default = False, is_flag = True)
 @click.option('-n', '--names', default = False, is_flag = True)
 @click.option('-v', '--verbose', default = False, is_flag = True)
-def genes(input_data: str, results: str, unique: bool, graphics: bool, names: bool):
+def genes(input_data: str, results: str, unique: bool, graphics: bool, names: bool, verbose: bool = False):
     """
     Converts a folder of KGML files or a single KGML file into a weighted
     edgelist of genes that can be used in graph analysis. If -u/--unique flag

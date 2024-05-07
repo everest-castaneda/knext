@@ -17,13 +17,10 @@ from itertools import combinations
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from knext import utils
+from knext.utils import FileNotFound
 
 
 
-class FileNotFound(Exception):
-    def __init__(self, message):
-        self.message = message
-        super().__init__(self.message)
 
 class GenesInteractionParser:
 

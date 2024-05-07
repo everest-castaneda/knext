@@ -75,6 +75,13 @@ class GenesInteractionParser:
                                                       4: 'value'}, axis='columns')
         # reorder columns as entry1, entry2, types, value, name
         df = df[['entry1', 'entry2', 'types', 'value', 'name']]
+
+        # parse graph position info if requested
+        if self.graphics:
+            graphics = utils.graphics_dict(self.root)
+            df['pos1'] = df['entry1'].map(graphics)
+            df['pos2'] = df['entry2'].map(graphics)
+
         # convert compound value to kegg id if only relation.type is "compound"
         def apply_conversion(row):
             if row['name'] == 'compound':
@@ -259,15 +266,10 @@ class GenesInteractionParser:
             typer.echo(typer.style(f'Now parsing: {title}...', fg=typer.colors.GREEN, bold=False))
         df = self._get_edges()
 
-        if self.graphics:
-            graphics = utils.graphics_dict(self.root)
-            df['pos1'] = df['entry1'].map(graphics)
-            df['pos2'] = df['entry2'].map(graphics)
-
         cliquedf, df_out = self._parse_clique(df)
 
         if self.graphics:
-            self._parse_graphics(df, graphics, df_out)
+            _parse_graphics(df_out, self.wd, pathway)
 
         xdf = self._replace_with_cliques(df, cliquedf, df_out)
 
@@ -294,17 +296,17 @@ class GenesInteractionParser:
         xdf.to_csv(self.wd / '{}.tsv'.format(pathway), sep = '\t', index = False)
 
 
-    def _parse_graphics(df, graphics, df_out, wd, pathway):
-        # Graphics
-        pos_dict1 = {}
-        pos_dict2 = {}
-        for index, rows in df_out.iterrows():
-            pos_dict1[rows['entry1']] = rows['pos1']
-            pos_dict2[rows['entry2']] = rows['pos2']
-        pos = pos_dict1 | pos_dict2
-        json_dict = json.dumps(pos)
-        with open(wd / '{}_graphics.txt'.format(pathway), 'w') as outfile:
-            outfile.write(json_dict)
+def _parse_graphics(df_out, wd, pathway):
+    # Graphics
+    pos_dict1 = {}
+    pos_dict2 = {}
+    for index, rows in df_out.iterrows():
+        pos_dict1[rows['entry1']] = rows['pos1']
+        pos_dict2[rows['entry2']] = rows['pos2']
+    pos = pos_dict1 | pos_dict2
+    json_dict = json.dumps(pos)
+    with open(wd / '{}_graphics.txt'.format(pathway), 'w') as outfile:
+        outfile.write(json_dict)
 
 
 

@@ -1,7 +1,6 @@
 import re
 from collections import defaultdict
 import urllib.request as request
-
 import numpy as np
 
 
@@ -137,3 +136,43 @@ def _parse_entries(root):
                 entry_type.append(i)
 
     return entry_id, entry_name, entry_type
+
+
+def UP(species):
+    url = 'http://rest.kegg.jp/conv/%s/uniprot'
+    response = request.urlopen(url % species).read().decode('utf-8')
+    response = response.rstrip().rsplit('\n')
+    entrez = []
+    uniprot = []
+    for resp in response:
+        uniprot.append(resp.rsplit()[0])
+        entrez.append(resp.rsplit()[1])
+    d = {}
+    for key, value in zip(entrez, uniprot):
+        if key not in d:
+            d[key] = [value]
+        else:
+            d[key].append(value)
+    return d
+
+def NCBI(species):
+    url = 'http://rest.kegg.jp/conv/%s/ncbi-geneid'
+    response = request.urlopen(url % species).read().decode('utf-8')
+    response = response.rstrip().rsplit('\n')
+    ncbi = []
+    kegg = []
+    for resp in response:
+        ncbi.append(resp.rsplit()[0])
+        kegg.append(resp.rsplit()[1])
+    d = {}
+    for key, value in zip(kegg, ncbi):
+        if key not in d:
+            d[key] = value
+        else:
+            d[key].append(value)
+    return d
+
+class FileNotFound(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)

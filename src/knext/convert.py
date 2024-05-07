@@ -6,6 +6,7 @@
 """
 
 import json
+import pathlib
 import re
 from pathlib import Path
 
@@ -37,26 +38,37 @@ class Converter:
             self.prefix = 'ncbi-geneid:'
 
     def _process_graphics(self):
-        #todo: add a check for the graphics file
-        pos = open(self.graphics)
+        # extract the filename part of self.input_data
+        graphics_file =pathlib.PurePath(self.graphics, Path(self.input_data).stem + '_graphics.txt')
+        if not Path(graphics_file).exists():
+            raise FileNotFound(f'Graphics file {graphics_file} not found!')
+        pos = open(graphics_file)
         d = json.loads(pos.read())
         conv_dict = {}
         for key, items in d.items():
-            pattern = re.search(r'(-[0-9]+)', key)
-            new_keys = re.sub(r'(-[0-9]+)', '', key)
+            # if unique, extract the terminal modifier for later re-addition
+            if self.unique:
+                pattern = re.search(r'(-[0-9]+)', key)
+                key = re.sub(r'(-[0-9]+)', '', key)
             try:
-                conv_list = self.conversion[new_keys]
-                new_conv = [conv + pattern.group() for conv in conv_list]
-                conv_dict[str(new_conv)] = items
-                for conv in new_conv:
-                    conv_dict[conv.replace(self.prefix, '')] = items
+                conv_list = self.conversion[key]
             except KeyError:
                 pass
+
+                if self.unique:
+                    # if self.unique is True, we need to add the terminal modifier back
+                    conv_list = [conv + pattern.group() for conv in conv_list]
+                for conv in conv_list:
+                    conv_dict[conv.replace(self.prefix, '')] = items
+
+
         for key, items in d.items():
             if not key.startswith(self.species):
                 conv_dict.update({key: items})
-        with open(self.wd / f'{self.prefix}_{Path(self.graphics).name}', 'w') as outfile:
+        prefix = 'up' if self.uniprot else 'ncbi-geneid'
+        with open(self.wd / f'{prefix}_{Path(graphics_file).name}', 'w') as outfile:
             outfile.write(json.dumps(conv_dict))
+        typer.echo(typer.style(f'Conversion of {Path(graphics_file).name} complete!', fg=typer.colors.GREEN, bold=True))
 
 
 
@@ -109,14 +121,14 @@ class Converter:
             typer.echo(f'Now converting {file.name} to UniProt IDs...')
             df_out = self._process_dataframe(df)
             df_out.to_csv(self.wd / 'up_{}'.format(file.name), sep='\t', index=False)
-            if self.graphics != None and Path(self.graphics).is_file():
+            if self.graphics != None:
                 typer.echo(f'Graphics file given! Now converting {Path(self.graphics).name} to UniProt IDs...')
                 self._process_graphics()
         else:
             typer.echo(f'Now converting {file.name} to NCBI IDs...')
             df_out = self._process_dataframe(df)
             df_out.to_csv(self.wd / 'ncbi_{}'.format(file.name), sep='\t', index=False)
-            if self.graphics != None and Path(self.graphics).is_file():
+            if self.graphics != None:
                 typer.echo(f'Graphics file given! Now converting {Path(self.graphics).name} to NCBI IDs...')
                 self._process_graphics()
 
@@ -131,7 +143,7 @@ def genes_convert(species, input_data, wd: Path, graphics=None,
     edgelist of genes that can be used in graph analysis.
     '''
     if Path(input_data).is_dir():
-        for file in Path(input_data).glob('*.xml'):
+        for file in Path(input_data).glob('*.tsv'):
             try:
                 converter = Converter(species, file, wd=wd, graphics=graphics,
                                       unique=unique, uniprot=uniprot,
